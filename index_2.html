@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f766e" />
+<title>Copiloto Pré-Op</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50">
+<div id="root"></div>
+
+<script>
+  window.SUPABASE_URL = "https://lncxfiugkwqorchqmhun.supabase.co";
+  window.SUPABASE_ANON_KEY = "sb_publishable_DHhJTH3U2U7rHlHMsZZGZw_hEY-4USm";
+</script>
+
+<script>
+  window.addEventListener("error", function (e) {
+    var r = document.getElementById("root");
+    if (r && !r.hasChildNodes()) r.innerHTML = '<div style="padding:24px;font-family:sans-serif;color:#b91c1c;font-size:14px">Erro ao carregar: ' + (e.message || e) + '</div>';
+  });
+</script>
+
+<script type="text/plain" id="appsrc">
+const { useState, useMemo, useEffect } = React;
+const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+const COMORB = [["has","HAS"],["dm2","DM2"],["drc","DRC"],["coronario","Coronariopatia"],["ic","Insuf. cardíaca"],["fa","Fibrilação atrial"],["aos","AOS conhecida"],["hepato","Hepatopatia"],["pneumo","Asma / DPOC"],["tireoide","Tireoidopatia"]];
+
+const EXGRUPOS = [
+  ["Hemograma", [["hemacias","Hemácias"],["hb","HB"],["gl","Leucóc."],["plq","Plaq."]]],
+  ["Coagulação", [["rni","RNI/INR"],["ptta","PTTA"]]],
+  ["Metabólico", [["glic","Glic. jejum"],["hba1c","HbA1c"]]],
+  ["Hepático", [["tgo","TGO"],["tgp","TGP"],["fa","FA"],["ggt","GGT"],["bilit","Bili T"],["bilid","Bili D"],["biliid","Bili I"]]],
+  ["Renal / Eletról.", [["cr","Creat."],["ur","Ureia"],["tfg","TFG"],["k","K⁺"]]],
+  ["Hormônios", [["tsh","TSH"],["t4l","T4L"],["antitpo","Anti-TPO"],["pth","PTH"],["testot","Testo T"],["testol","Testo L"],["dht","DHT"]]],
+  ["Vitaminas / Minerais", [["b12","B12"],["vitd","Vit D"],["ferrit","Ferrit."],["zinco","Zinco"]]],
+  ["Sorologias", [["antihbs","Anti-HBs"],["hbsag","HBsAg"],["antihiv","Anti-HIV"],["antihcv","Anti-HCV"],["vdrl","VDRL"]]],
+];
+const EXFLAT = EXGRUPOS.flatMap(([,arr]) => arr);
+
+const input = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 focus:outline-none";
+const num = (v) => (v === "" || v == null ? NaN : Number(v));
+function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]||"");r.onerror=()=>rej(new Error("Falha ao ler o arquivo"));r.readAsDataURL(file);});}
+
+const FEEGOW_LABELS = ["DECISÃO","EXAMES ALTERADOS","RISCO CIRÚRGICO","COURO CABELUDO","EF","CONDUTA","ORIENTAÇÕES AO PACIENTE"];
+const SCALP = [["seborreica","Dermatite seborreica"],["foliculite","Foliculite"],["exantema","Exantema"]];
+function parseFeegow(raw){
+  const out={}; let cur=null;
+  raw.split("\n").forEach(line=>{
+    const m=line.match(/^([A-ZÇÃÁÉÍÓÚÀÂÊÔÕ /]+):\s*(.*)$/);
+    const lbl=m?FEEGOW_LABELS.find(l=>m[1].trim().startsWith(l)):null;
+    if(lbl){ cur=lbl; out[cur]=(m[2]||""); }
+    else if(cur!=null){ out[cur]=(out[cur]?out[cur]+"\n":"")+line; }
+  });
+  Object.keys(out).forEach(k=>out[k]=out[k].trim());
+  return out;
+}
+
+function Auth() {
+  const [email,setEmail]=useState(""); const [senha,setSenha]=useState(""); const [modo,setModo]=useState("entrar");
+  const [msg,setMsg]=useState(""); const [busy,setBusy]=useState(false);
+  async function go(){
+    setBusy(true); setMsg("");
+    const fn = modo==="entrar" ? sb.auth.signInWithPassword({email,password:senha}) : sb.auth.signUp({email,password:senha});
+    const { error } = await fn;
+    if (error) setMsg(error.message);
+    else if (modo==="criar") setMsg("Conta criada. Se pedir, confirme o e-mail e entre.");
+    setBusy(false);
+  }
+  return (
+    <div className="mx-auto mt-16 max-w-sm px-4">
+      <div className="mb-6 text-center"><h1 className="text-2xl font-bold tracking-tight text-slate-900">Copiloto Pré-Op</h1><p className="text-sm text-slate-500">Acesso restrito</p></div>
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <input className={input} type="email" placeholder="e-mail" value={email} onChange={e=>setEmail(e.target.value)} />
+        <input className={input} type="password" placeholder="senha" value={senha} onChange={e=>setSenha(e.target.value)} />
+        <button onClick={go} disabled={busy||!email||!senha} className="w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300">{busy?"…":(modo==="entrar"?"Entrar":"Criar conta")}</button>
+        {msg && <p className="text-xs text-slate-500">{msg}</p>}
+        <button onClick={()=>setModo(modo==="entrar"?"criar":"entrar")} className="w-full text-xs text-teal-700">{modo==="entrar"?"Criar uma conta":"Já tenho conta"}</button>
+      </div>
+    </div>
+  );
+}
+
+function Avaliacao({ session }) {
+  const [p,setP]=useState({codigo:"",idade:"",sexo:"M",altura:"",peso:"",medicacoes:"",exAlt:"",exLivre:"",funcional:"desconhecido",scalpObs:""});
+  const [scalp,setScalp]=useState({});
+  const [ex,setEx]=useState({});
+  const [comorb,setComorb]=useState({}); const [usarBusca,setUsarBusca]=useState(true);
+  const [loading,setLoading]=useState(false); const [erro,setErro]=useState(""); const [laudo,setLaudo]=useState(""); const [salvo,setSalvo]=useState(false);
+  const [pdfBusy,setPdfBusy]=useState(false); const [pdfMsg,setPdfMsg]=useState(""); const [copiado,setCopiado]=useState("");
+  const set=(k,v)=>setP(s=>({...s,[k]:v}));
+  const setE=(k,v)=>setEx(s=>({...s,[k]:v}));
+
+  const imc=useMemo(()=>{const h=num(p.altura)/100,w=num(p.peso);return h>0&&w>0?w/(h*h):NaN;},[p.altura,p.peso]);
+
+  async function lerArquivo(file){
+    if(!file) return;
+    setPdfMsg("");
+    const ok=["application/pdf","image/jpeg","image/png","image/webp"];
+    if(!ok.includes(file.type)){ setPdfMsg("Use PDF, JPG, PNG ou WEBP."); return; }
+    if(file.size>4*1024*1024){ setPdfMsg("Arquivo grande demais (máx. 4 MB). Comprima ou fotografe em partes."); return; }
+    setPdfBusy(true);
+    try{
+      const base64=await fileToB64(file);
+      const { data:{ session:s } }=await sb.auth.getSession();
+      const r=await fetch("/api/extrair",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${s.access_token}`},body:JSON.stringify({base64,mediaType:file.type})});
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error||"Falha ao ler");
+      const d=j.extraido||{};
+      if(d.ex&&typeof d.ex==="object") setEx(prev=>({...prev,...d.ex}));
+      setP(prev=>{
+        const np={...prev};
+        if(d.idade&&!prev.idade) np.idade=String(d.idade);
+        if(d.sexo==="M"||d.sexo==="F") np.sexo=d.sexo;
+        if(Array.isArray(d.alterados)&&d.alterados.length){
+          np.exAlt=d.alterados.map(a=>`${a.nome}: ${a.valor||""}${a.unidade?" "+a.unidade:""}${a.referencia?" (ref "+a.referencia+")":""}${a.direcao?" ["+a.direcao+"]":""}`).join("\n");
+        }
+        if(d.outros) np.exLivre=d.outros;
+        return np;
+      });
+      const n=Array.isArray(d.alterados)?d.alterados.length:0;
+      setPdfMsg("Lido ✓ — campos preenchidos."+(n?` ${n} valor(es) alterado(s) detectado(s).`:"")+" Confira antes de gerar.");
+    }catch(e){ setPdfMsg(e.message); }
+    finally{ setPdfBusy(false); }
+  }
+
+  function montarDados(){
+    const co=COMORB.filter(([k])=>comorb[k]).map(([,l])=>l);
+    const exLin=EXFLAT.filter(([k])=>ex[k]&&String(ex[k]).trim()).map(([k,l])=>`${l} ${ex[k]}`).join("; ");
+    const fmap={ge4:"≥4 METs",lt4:"<4 METs (dispneia leve)",desconhecido:"não avaliada"};
+    return `PACIENTE (pseudonimizado, código ${p.codigo||"?"})
+Idade ${p.idade||"?"} | Sexo ${p.sexo} | Peso ${p.peso||"?"} kg | IMC ${Number.isFinite(imc)?imc.toFixed(1):"?"}
+Comorbidades: ${co.join(", ")||"nenhuma referida"}
+Capacidade funcional: ${fmap[p.funcional]}
+Medicações:
+${p.medicacoes.trim()||"(não informadas)"}
+Exames: ${exLin||"(não informados)"}
+Exames ALTERADOS (campo de atenção): ${p.exAlt.trim()||"(nenhum sinalizado)"}
+Outros achados: ${p.exLivre.trim()||"—"}
+Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.trim()].filter(Boolean).join("; ")||"sem alteração relatada"}`;
+  }
+
+  async function gerar(){
+    setErro(""); setLaudo(""); setSalvo(false); setLoading(true);
+    try{
+      const { data:{ session: s } } = await sb.auth.getSession();
+      const r=await fetch("/api/avaliar",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${s.access_token}`},body:JSON.stringify({dados:montarDados(),usarBusca})});
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error||"Falha");
+      setLaudo(j.laudo);
+    }catch(e){ setErro(e.message+' — se persistir, desmarque "Confirmar na fonte".'); }
+    finally{ setLoading(false); }
+  }
+
+  async function salvar(){
+    if(!p.codigo.trim()){ setErro("Defina um código para o caso antes de salvar."); return; }
+    const { error } = await sb.from("casos").insert({
+      user_id: session.user.id, codigo:p.codigo.trim(), idade:num(p.idade)||null, sexo:p.sexo,
+      dados:{ comorbidades:COMORB.filter(([k])=>comorb[k]).map(([,l])=>l), imc:Number.isFinite(imc)?+imc.toFixed(1):null, alterados:p.exAlt||null }, laudo
+    });
+    if(error) setErro(error.message); else setSalvo(true);
+  }
+
+  function copiar(txt,qual){ try{ navigator.clipboard.writeText(txt).then(()=>{setCopiado(qual);setTimeout(()=>setCopiado(""),1500);}); }catch(e){} }
+
+  // ---- parse do laudo ----
+  const exBlock=(laudo.match(/===EXAMES===([\s\S]*?)===FIM===/i)||[])[1]||"";
+  const examRows=exBlock.trim().split("\n").map(s=>s.trim()).filter(s=>s&&s.includes("|"))
+    .map(line=>{const c=line.split("|").map(x=>x.trim());return {grav:(c[0]||"").toLowerCase(),exame:c[1]||"",hip:c[2]||"",motivo:c[3]||"",conduta:c[4]||""};})
+    .filter(r=>r.grav!=="nenhum");
+  const partes=laudo.split(/---\s*FEEGOW\s*---/i);
+  const clin=(partes[0]||"").replace(/===EXAMES===[\s\S]*?===FIM===/i,"").replace(/^\s*DECIS[ÃA]O:[^\n]*\n?/i,"").trim();
+  const fg=parseFeegow((partes[1]||"").trim());
+  const decRaw=((laudo.match(/DECIS[ÃA]O:\s*(CIRURGIA LIBERADA|INVESTIGAR[^\n]*|CIRURGIA NEGADA)/i)||[])[1]||"").toUpperCase();
+  const dec=decRaw.includes("LIBERADA")?"liberada":decRaw.includes("NEGADA")?"negada":decRaw.includes("INVESTIGAR")?"investigar":"";
+  const decCfg={liberada:{txt:"CIRURGIA LIBERADA",cls:"border-emerald-300 bg-emerald-50 text-emerald-800"},investigar:{txt:"INVESTIGAR ALTERAÇÃO",cls:"border-amber-300 bg-amber-50 text-amber-800"},negada:{txt:"CIRURGIA NEGADA",cls:"border-red-300 bg-red-50 text-red-800"}}[dec];
+  const gcard={alta:"border-red-300 bg-red-50",media:"border-amber-300 bg-amber-50",baixa:"border-emerald-300 bg-emerald-50"};
+  const gtxt={alta:"text-red-800",media:"text-amber-800",baixa:"text-emerald-800"};
+  const gtag={alta:"Atenção alta",media:"Acompanhar",baixa:"Leve"};
+  const clinSections=clin.split(/\n(?=# )/).map(s=>s.trim()).filter(Boolean).map(sec=>{const nl=sec.indexOf("\n");return {titulo:(nl<0?sec:sec.slice(0,nl)).replace(/^#\s+/,"").trim(),corpo:(nl<0?"":sec.slice(nl+1)).trim()};});
+  const evolucaoCompleta=(()=>{
+    let evo=laudo.replace(/===EXAMES===([\s\S]*?)===FIM===/i,(m,inner)=>{
+      const rows=inner.trim().split("\n").map(s=>s.trim()).filter(s=>s.includes("|"));
+      const lines=rows.map(line=>{const c=line.split("|").map(x=>x.trim());if((c[0]||"").toLowerCase()==="nenhum")return "Sem alterações relevantes.";return `- ${c[1]}: ${c[2]}; motivo: ${c[3]}; conduta: ${c[4]}`;});
+      return "EXAMES ALTERADOS — LEITURA:\n"+lines.join("\n");
+    });
+    evo=evo.replace(/---\s*FEEGOW\s*---/i,"").replace(/^#\s+/gm,"").trim();
+    return `AVALIAÇÃO PRÉ-OPERATÓRIA${p.codigo?(" — "+p.codigo):""}\n\n`+evo;
+  })();
+  const podeGerar=p.idade!==""&&p.peso!==""&&!loading;
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="lg:col-span-7">
+        <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">Código do caso <span className="text-xs text-slate-400">(iniciais/apelido — nunca o nome)</span></label>
+            <input className={input} value={p.codigo} onChange={e=>set("codigo",e.target.value)} placeholder="ex.: MJ-67" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm text-slate-600 mb-1">Idade</label><input className={input} inputMode="numeric" value={p.idade} onChange={e=>set("idade",e.target.value)} /></div>
+            <div><label className="block text-sm text-slate-600 mb-1">Sexo</label><select className={input} value={p.sexo} onChange={e=>set("sexo",e.target.value)}><option value="M">Masculino</option><option value="F">Feminino</option><option value="outro">Outro</option></select></div>
+            <div><label className="block text-sm text-slate-600 mb-1">Altura (cm)</label><input className={input} inputMode="numeric" value={p.altura} onChange={e=>set("altura",e.target.value)} /></div>
+            <div><label className="block text-sm text-slate-600 mb-1">Peso (kg)</label><input className={input} inputMode="numeric" value={p.peso} onChange={e=>set("peso",e.target.value)} /></div>
+          </div>
+          {Number.isFinite(imc)&&<p className="text-xs text-slate-500">IMC <span className="font-mono font-semibold">{imc.toFixed(1)}</span></p>}
+          <div>
+            <p className="text-sm text-slate-600 mb-2">Comorbidades</p>
+            <div className="flex flex-wrap gap-2">{COMORB.map(([k,l])=><button key={k} onClick={()=>setComorb(s=>({...s,[k]:!s[k]}))} className={"rounded-full border px-3 py-1.5 text-sm "+(comorb[k]?"border-teal-600 bg-teal-50 text-teal-800":"border-slate-300 text-slate-600")}>{l}</button>)}</div>
+          </div>
+          <div><label className="block text-sm text-slate-600 mb-1">Medicações (uma por linha)</label><textarea className={input+" min-h-[80px] font-mono text-xs"} value={p.medicacoes} onChange={e=>set("medicacoes",e.target.value)} /></div>
+          <div><label className="block text-sm text-slate-600 mb-1">Capacidade funcional</label><select className={input} value={p.funcional} onChange={e=>set("funcional",e.target.value)}><option value="ge4">≥4 METs — sobe escada sem sintoma</option><option value="lt4">&lt;4 METs — dispneia leve</option><option value="desconhecido">Não avaliada</option></select></div>
+          <div>
+            <p className="text-sm text-slate-600 mb-2">Couro cabeludo</p>
+            <div className="flex flex-wrap gap-2 mb-2">{SCALP.map(([k,l])=><button key={k} onClick={()=>setScalp(s=>({...s,[k]:!s[k]}))} className={"rounded-full border px-3 py-1.5 text-sm "+(scalp[k]?"border-teal-600 bg-teal-50 text-teal-800":"border-slate-300 text-slate-600")}>{l}</button>)}</div>
+            <input className={input} placeholder="outros achados do couro cabeludo (opcional)" value={p.scalpObs} onChange={e=>set("scalpObs",e.target.value)} />
+          </div>
+
+          <div className="space-y-3 border-t border-slate-100 pt-4">
+            <p className="text-sm font-medium text-slate-700">Exames</p>
+            <div className="rounded-lg border border-dashed border-teal-300 bg-teal-50/40 p-3">
+              <label className="flex cursor-pointer flex-col items-center gap-1 text-center">
+                <span className="text-sm font-medium text-teal-800">{pdfBusy?"Lendo o exame…":"Enviar PDF ou foto do exame"}</span>
+                <span className="text-xs text-slate-500">Preenche os campos sozinho. PDF, JPG, PNG (máx. 4 MB).</span>
+                <input type="file" accept="application/pdf,image/*" className="hidden" disabled={pdfBusy} onChange={e=>{const f=e.target.files&&e.target.files[0]; lerArquivo(f); e.target.value="";}} />
+              </label>
+              {pdfMsg&&<p className="mt-2 text-center text-xs text-slate-600">{pdfMsg}</p>}
+            </div>
+            {EXGRUPOS.map(([g,arr])=>(
+              <div key={g}>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{g}</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {arr.map(([k,l])=>(
+                    <div key={k}>
+                      <label className="block text-[11px] text-slate-500 mb-0.5">{l}</label>
+                      <input className={input+" px-2 py-1.5"} value={ex[k]||""} onChange={e=>setE(k,e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div><label className="block text-sm text-slate-600 mb-1">Campo de atenção — exames alterados</label><textarea className={input+" min-h-[60px] text-xs"} value={p.exAlt} onChange={e=>set("exAlt",e.target.value)} placeholder="preenchido ao ler o exame; pode editar" /></div>
+            <input className={input} placeholder="outros achados" value={p.exLivre} onChange={e=>set("exLivre",e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      <div className="lg:col-span-5">
+        <div className="space-y-4 lg:sticky lg:top-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <label className="mb-3 flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={usarBusca} onChange={e=>setUsarBusca(e.target.checked)} className="h-4 w-4 accent-teal-700" /> Confirmar diretrizes na fonte</label>
+            <button onClick={gerar} disabled={!podeGerar} className="w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300">{loading?"Gerando…":"Gerar avaliação"}</button>
+            {!podeGerar&&!loading&&<p className="mt-2 text-xs text-slate-400">Informe ao menos idade e peso.</p>}
+            {erro&&<p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{erro}</p>}
+          </div>
+
+          {decCfg&&(
+            <div className={"rounded-xl border-2 p-4 text-center shadow-sm "+decCfg.cls}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">Decisão sugerida</p>
+              <p className="mt-1 text-lg font-bold">{decCfg.txt}</p>
+            </div>
+          )}
+
+          {examRows.length>0&&(
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Exames alterados — leitura</p>
+              <div className="space-y-2">
+                {examRows.map((r,i)=>(
+                  <div key={i} className={"rounded-lg border p-3 "+(gcard[r.grav]||"border-slate-200 bg-slate-50")}>
+                    <div className="flex items-center justify-between">
+                      <span className={"text-sm font-semibold "+(gtxt[r.grav]||"text-slate-700")}>{r.exame}</span>
+                      <span className={"rounded-full px-2 py-0.5 text-[10px] font-medium "+(gcard[r.grav]||"")+" "+(gtxt[r.grav]||"text-slate-500")}>{gtag[r.grav]||"—"}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-700"><span className="font-medium text-slate-500">Hipóteses: </span>{r.hip}</p>
+                    <p className="mt-0.5 text-xs text-slate-700"><span className="font-medium text-slate-500">Por que: </span>{r.motivo}</p>
+                    <p className="mt-0.5 text-xs text-slate-700"><span className="font-medium text-slate-500">Conduta: </span>{r.conduta}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {clinSections.map((sec,si)=>(
+            <div key={si} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-teal-700">{sec.titulo}</p>
+              <div className="space-y-1 text-sm leading-relaxed text-slate-700">{sec.corpo.split("\n").map((ln,i)=>ln.trim()?<p key={i} className={ln.trim().startsWith("-")?"pl-3 -indent-3":""}>{ln}</p>:<div key={i} className="h-1" />)}</div>
+            </div>
+          ))}
+
+          {laudo&&(
+            <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-700">Laudo — formato Feegow</span>
+                <button onClick={()=>copiar(evolucaoCompleta,"tudo")} className="rounded-md border border-teal-600 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">{copiado==="tudo"?"Copiado ✓":"Copiar evolução"}</button>
+              </div>
+              <div className="space-y-3">
+                {FEEGOW_LABELS.map(l=> fg[l] ? (
+                  <div key={l} className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{l}</span>
+                      <button onClick={()=>copiar(fg[l],l)} className="text-[11px] text-teal-700 hover:underline">{copiado===l?"copiado ✓":"copiar"}</button>
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{fg[l]}</p>
+                  </div>
+                ) : null)}
+              </div>
+              <button onClick={salvar} className="mt-4 w-full rounded-md border border-teal-600 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50">{salvo?"Salvo no histórico ✓":"Salvar no histórico"}</button>
+            </div>
+          )}
+          {laudo&&<p className="px-1 text-[11px] leading-snug text-slate-400">Apoio à decisão gerado por IA. Confira cada conduta, confirme tempos de suspensão na diretriz vigente e registre a decisão final sob sua responsabilidade.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Historico() {
+  const [casos,setCasos]=useState(null); const [aberto,setAberto]=useState(null);
+  useEffect(()=>{ sb.from("casos").select("*").order("created_at",{ascending:false}).then(({data})=>setCasos(data||[])); },[]);
+  if(casos===null) return <p className="text-sm text-slate-500">Carregando…</p>;
+  if(casos.length===0) return <p className="text-sm text-slate-500">Nenhum caso salvo ainda.</p>;
+  return (
+    <div className="space-y-3">
+      {casos.map(c=>(
+        <div key={c.id} className="rounded-lg border border-slate-200 bg-white p-4">
+          <button onClick={()=>setAberto(aberto===c.id?null:c.id)} className="flex w-full items-center justify-between text-left">
+            <span className="font-medium text-slate-800">{c.codigo} <span className="text-xs font-normal text-slate-400">· {c.idade||"?"}a · {new Date(c.created_at).toLocaleDateString("pt-BR")}</span></span>
+            <span className="text-xs text-teal-700">{aberto===c.id?"fechar":"ver"}</span>
+          </button>
+          {aberto===c.id&&<div className="mt-3 whitespace-pre-wrap border-t border-slate-100 pt-3 text-sm text-slate-700">{c.laudo||"(sem laudo)"}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function App(){
+  const [session,setSession]=useState(undefined); const [tab,setTab]=useState("nova");
+  useEffect(()=>{ sb.auth.getSession().then(({data})=>setSession(data.session)); const { data:sub }=sb.auth.onAuthStateChange((_e,s)=>setSession(s)); return ()=>sub.subscription.unsubscribe(); },[]);
+  if(session===undefined) return null;
+  if(!session) return <Auth />;
+  return (
+    <div className="min-h-screen">
+      <div className="h-1 w-full bg-teal-700"></div>
+      <div className="mx-auto max-w-6xl px-4 py-5">
+        <header className="mb-4 flex items-center justify-between">
+          <div><h1 className="text-xl font-bold tracking-tight text-slate-900">Copiloto Pré-Op</h1><p className="text-xs text-slate-500">{session.user.email}</p></div>
+          <button onClick={()=>sb.auth.signOut()} className="text-xs text-slate-500 hover:text-slate-700">Sair</button>
+        </header>
+        <div className="mb-5 flex gap-2">
+          <button onClick={()=>setTab("nova")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="nova"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Nova avaliação</button>
+          <button onClick={()=>setTab("hist")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="hist"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Histórico</button>
+        </div>
+        {tab==="nova"?<Avaliacao session={session} />:<Historico />}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+</script>
+
+<script>
+  (function () {
+    try {
+      var src = document.getElementById("appsrc").textContent;
+      var out = Babel.transform(src, { presets: [["react", { runtime: "classic" }]] }).code;
+      (0, eval)(out);
+    } catch (e) {
+      var r = document.getElementById("root");
+      if (r) r.innerHTML = '<div style="padding:24px;font-family:sans-serif;color:#b91c1c;font-size:14px">Erro ao iniciar: ' + (e && e.message ? e.message : e) + '</div>';
+    }
+  })();
+</script>
+</body>
+</html>
