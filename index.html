@@ -16,17 +16,12 @@
 <body class="bg-slate-50">
 <div id="root"></div>
 
-<!-- ===================================================================
-     CONFIGURE AQUI (passo do README): cole os dados do seu projeto Supabase.
-     Estas duas chaves são PÚBLICAS por design e protegidas pelo RLS do banco.
-     =================================================================== -->
 <script>
   window.SUPABASE_URL = "https://lncxfiugkwqorchqmhun.supabase.co";
   window.SUPABASE_ANON_KEY = "sb_publishable_DHhJTH3U2U7rHlHMsZZGZw_hEY-4USm";
 </script>
 
 <script>
-  // Se algo falhar ao iniciar, mostra a mensagem na tela em vez de ficar em branco.
   window.addEventListener("error", function (e) {
     var r = document.getElementById("root");
     if (r && !r.hasChildNodes()) {
@@ -40,8 +35,22 @@ const { useState, useMemo, useEffect } = React;
 const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 
 const COMORB = [["has","HAS"],["dm2","DM2"],["drc","DRC"],["coronario","Coronariopatia"],["ic","Insuf. cardíaca"],["fa","Fibrilação atrial"],["aos","AOS conhecida"],["hepato","Hepatopatia"],["pneumo","Asma / DPOC"],["tireoide","Tireoidopatia"]];
+
+const EXGRUPOS = [
+  ["Hemograma", [["hemacias","Hemácias"],["hb","HB"],["gl","Leucóc."],["plq","Plaq."]]],
+  ["Coagulação", [["rni","RNI/INR"],["ptta","PTTA"]]],
+  ["Metabólico", [["glic","Glic. jejum"],["hba1c","HbA1c"]]],
+  ["Hepático", [["tgo","TGO"],["tgp","TGP"],["fa","FA"],["ggt","GGT"],["bilit","Bili T"],["bilid","Bili D"],["biliid","Bili I"]]],
+  ["Renal / Eletról.", [["cr","Creat."],["ur","Ureia"],["tfg","TFG"],["k","K⁺"]]],
+  ["Hormônios", [["tsh","TSH"],["t4l","T4L"],["antitpo","Anti-TPO"],["pth","PTH"],["testot","Testo T"],["testol","Testo L"],["dht","DHT"]]],
+  ["Vitaminas / Minerais", [["b12","B12"],["vitd","Vit D"],["ferrit","Ferrit."],["zinco","Zinco"]]],
+  ["Sorologias", [["antihbs","Anti-HBs"],["hbsag","HBsAg"],["antihiv","Anti-HIV"],["antihcv","Anti-HCV"],["vdrl","VDRL"]]],
+];
+const EXFLAT = EXGRUPOS.flatMap(([,arr]) => arr);
+
 const input = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 focus:outline-none";
 const num = (v) => (v === "" || v == null ? NaN : Number(v));
+function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]||"");r.onerror=()=>rej(new Error("Falha ao ler o arquivo"));r.readAsDataURL(file);});}
 
 function Meter({ title, big, unit, band, note, segments, segActive }) {
   const tones = { low:"text-emerald-700 bg-emerald-50 border-emerald-200", mid:"text-amber-700 bg-amber-50 border-amber-200", high:"text-red-700 bg-red-50 border-red-200", none:"text-slate-500 bg-slate-50 border-slate-200" };
@@ -85,25 +94,62 @@ function Auth() {
 }
 
 function Avaliacao({ session }) {
-  const [p,setP]=useState({codigo:"",idade:"",sexo:"M",altura:"",peso:"",medicacoes:"",exHb:"",exCr:"",exTfg:"",exHba1c:"",exK:"",exInr:"",exLivre:"",funcional:"desconhecido",ronco:false,cansaco:false,apneiaObs:false,pescoco:false,tumConc:"0.1",tumVol:"",tumTeto:""});
+  const [p,setP]=useState({codigo:"",idade:"",sexo:"M",altura:"",peso:"",medicacoes:"",exAlt:"",exLivre:"",funcional:"desconhecido",ronco:false,cansaco:false,apneiaObs:false,pescoco:false,tumConc:"0.1",tumVol:"",tumTeto:""});
+  const [ex,setEx]=useState({});
   const [comorb,setComorb]=useState({}); const [usarBusca,setUsarBusca]=useState(true);
   const [loading,setLoading]=useState(false); const [erro,setErro]=useState(""); const [laudo,setLaudo]=useState(""); const [salvo,setSalvo]=useState(false);
+  const [pdfBusy,setPdfBusy]=useState(false); const [pdfMsg,setPdfMsg]=useState(""); const [copiado,setCopiado]=useState("");
   const set=(k,v)=>setP(s=>({...s,[k]:v}));
+  const setE=(k,v)=>setEx(s=>({...s,[k]:v}));
 
   const imc=useMemo(()=>{const h=num(p.altura)/100,w=num(p.peso);return h>0&&w>0?w/(h*h):NaN;},[p.altura,p.peso]);
   const stop=useMemo(()=>{const it={S:p.ronco,T:p.cansaco,O:p.apneiaObs,P:!!comorb.has,B:imc>35,A:num(p.idade)>50,N:p.pescoco,G:p.sexo==="M"};const s=Object.values(it).filter(Boolean).length;let band={label:"—",tone:"none"};if(p.idade!==""){band=s<=2?{label:"Baixo",tone:"low"}:s<=4?{label:"Intermediário",tone:"mid"}:{label:"Alto",tone:"high"};}return{it,s,band};},[p.ronco,p.cansaco,p.apneiaObs,p.pescoco,p.sexo,p.idade,comorb.has,imc]);
   const last=useMemo(()=>{const c=num(p.tumConc),v=num(p.tumVol),w=num(p.peso),t=num(p.tumTeto);if(!(c>0&&v>0&&w>0))return{ok:false};const tot=v*c*10,mgkg=tot/w;let band;if(mgkg<=7)band={label:"≤ clássico",tone:"low"};else if(mgkg<=(t>0?t:35))band={label:t>0?"≤ teto":"> clássico",tone:"mid"};else band={label:"> teto",tone:"high"};return{ok:true,tot,mgkg,band};},[p.tumConc,p.tumVol,p.peso,p.tumTeto]);
 
+  async function lerArquivo(file){
+    if(!file) return;
+    setPdfMsg("");
+    const ok=["application/pdf","image/jpeg","image/png","image/webp"];
+    if(!ok.includes(file.type)){ setPdfMsg("Use PDF, JPG, PNG ou WEBP."); return; }
+    if(file.size>4*1024*1024){ setPdfMsg("Arquivo grande demais (máx. 4 MB). Comprima ou fotografe em partes."); return; }
+    setPdfBusy(true);
+    try{
+      const base64=await fileToB64(file);
+      const { data:{ session:s } }=await sb.auth.getSession();
+      const r=await fetch("/api/extrair",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${s.access_token}`},body:JSON.stringify({base64,mediaType:file.type})});
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error||"Falha ao ler");
+      const d=j.extraido||{};
+      if(d.ex&&typeof d.ex==="object") setEx(prev=>({...prev,...d.ex}));
+      setP(prev=>{
+        const np={...prev};
+        if(d.idade&&!prev.idade) np.idade=String(d.idade);
+        if(d.sexo==="M"||d.sexo==="F") np.sexo=d.sexo;
+        if(Array.isArray(d.alterados)&&d.alterados.length){
+          np.exAlt=d.alterados.map(a=>`${a.nome}: ${a.valor||""}${a.unidade?" "+a.unidade:""}${a.referencia?" (ref "+a.referencia+")":""}${a.direcao?" ["+a.direcao+"]":""}`).join("\n");
+        }
+        if(d.outros) np.exLivre=d.outros;
+        return np;
+      });
+      const n=Array.isArray(d.alterados)?d.alterados.length:0;
+      setPdfMsg("Lido ✓ — campos preenchidos."+(n?` ${n} valor(es) alterado(s) detectado(s).`:"")+" Confira antes de gerar.");
+    }catch(e){ setPdfMsg(e.message); }
+    finally{ setPdfBusy(false); }
+  }
+
   function montarDados(){
     const co=COMORB.filter(([k])=>comorb[k]).map(([,l])=>l);
-    const ex=[p.exHb&&`Hb ${p.exHb}`,p.exCr&&`Cr ${p.exCr}`,p.exTfg&&`TFG ${p.exTfg}`,p.exHba1c&&`HbA1c ${p.exHba1c}`,p.exK&&`K ${p.exK}`,p.exInr&&`INR ${p.exInr}`,p.exLivre].filter(Boolean).join("; ");
+    const exLin=EXFLAT.filter(([k])=>ex[k]&&String(ex[k]).trim()).map(([k,l])=>`${l} ${ex[k]}`).join("; ");
     const fmap={ge4:"≥4 METs",lt4:"<4 METs (dispneia leve)",desconhecido:"não avaliada"};
     return `PACIENTE (pseudonimizado, código ${p.codigo||"?"})
 Idade ${p.idade||"?"} | Sexo ${p.sexo} | Peso ${p.peso||"?"} kg | IMC ${Number.isFinite(imc)?imc.toFixed(1):"?"}
 Comorbidades: ${co.join(", ")||"nenhuma referida"}
 Capacidade funcional: ${fmap[p.funcional]}
-Medicações:\n${p.medicacoes.trim()||"(não informadas)"}
-Exames: ${ex||"(não informados)"}
+Medicações:
+${p.medicacoes.trim()||"(não informadas)"}
+Exames: ${exLin||"(não informados)"}
+Exames ALTERADOS (campo de atenção): ${p.exAlt.trim()||"(nenhum sinalizado)"}
+Outros achados: ${p.exLivre.trim()||"—"}
 CÁLCULOS: STOP-BANG ${stop.s}/8 (${stop.band.label}); LAST ${last.ok?last.mgkg.toFixed(1)+" mg/kg":"insuf."}`;
   }
 
@@ -123,12 +169,17 @@ CÁLCULOS: STOP-BANG ${stop.s}/8 (${stop.band.label}); LAST ${last.ok?last.mgkg.
     if(!p.codigo.trim()){ setErro("Defina um código para o caso antes de salvar."); return; }
     const { error } = await sb.from("casos").insert({
       user_id: session.user.id, codigo:p.codigo.trim(), idade:num(p.idade)||null, sexo:p.sexo,
-      dados:{ comorbidades:COMORB.filter(([k])=>comorb[k]).map(([,l])=>l), imc:Number.isFinite(imc)?+imc.toFixed(1):null, stopbang:stop.s, last:last.ok?+last.mgkg.toFixed(1):null }, laudo
+      dados:{ comorbidades:COMORB.filter(([k])=>comorb[k]).map(([,l])=>l), imc:Number.isFinite(imc)?+imc.toFixed(1):null, stopbang:stop.s, last:last.ok?+last.mgkg.toFixed(1):null, alterados:p.exAlt||null }, laudo
     });
     if(error) setErro(error.message); else { setSalvo(true); }
   }
 
-  const tag=(laudo.match(/\[(APTO|OTIMIZAR|ADIAR|ESCALAR)\]/)||[])[1];
+  function copiar(txt,qual){ try{ navigator.clipboard.writeText(txt).then(()=>{setCopiado(qual);setTimeout(()=>setCopiado(""),1500);}); }catch(e){} }
+
+  const partes=laudo.split(/---\s*FEEGOW\s*---/i);
+  const laudoClin=(partes[0]||"").trim();
+  const feegow=(partes[1]||"").trim();
+  const tag=(laudoClin.match(/\[(APTO|OTIMIZAR|ADIAR|ESCALAR)\]/)||[])[1];
   const tagCls={APTO:"bg-emerald-50 border-emerald-200 text-emerald-800",OTIMIZAR:"bg-amber-50 border-amber-200 text-amber-800",ADIAR:"bg-red-50 border-red-200 text-red-800",ESCALAR:"bg-red-50 border-red-200 text-red-800"}[tag]||"";
   const podeGerar=p.idade!==""&&p.peso!==""&&!loading;
 
@@ -152,13 +203,34 @@ CÁLCULOS: STOP-BANG ${stop.s}/8 (${stop.band.label}); LAST ${last.ok?last.mgkg.
             <div className="flex flex-wrap gap-2">{COMORB.map(([k,l])=><button key={k} onClick={()=>setComorb(s=>({...s,[k]:!s[k]}))} className={"rounded-full border px-3 py-1.5 text-sm "+(comorb[k]?"border-teal-600 bg-teal-50 text-teal-800":"border-slate-300 text-slate-600")}>{l}</button>)}</div>
           </div>
           <div><label className="block text-sm text-slate-600 mb-1">Medicações (uma por linha)</label><textarea className={input+" min-h-[80px] font-mono text-xs"} value={p.medicacoes} onChange={e=>set("medicacoes",e.target.value)} /></div>
-          <div>
-            <p className="text-sm text-slate-600 mb-2">Exames</p>
-            <div className="grid grid-cols-3 gap-3">
-              {[["exHb","Hb"],["exCr","Creatinina"],["exTfg","TFG"],["exHba1c","HbA1c"],["exK","K⁺"],["exInr","INR"]].map(([k,l])=><div key={k}><label className="block text-xs text-slate-500 mb-1">{l}</label><input className={input} value={p[k]} onChange={e=>set(k,e.target.value)} /></div>)}
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-slate-700">Exames</p>
+            <div className="rounded-lg border border-dashed border-teal-300 bg-teal-50/40 p-3">
+              <label className="flex cursor-pointer flex-col items-center gap-1 text-center">
+                <span className="text-sm font-medium text-teal-800">{pdfBusy?"Lendo o exame…":"Enviar PDF ou foto do exame"}</span>
+                <span className="text-xs text-slate-500">Preenche os campos sozinho. PDF, JPG, PNG (máx. 4 MB).</span>
+                <input type="file" accept="application/pdf,image/*" className="hidden" disabled={pdfBusy} onChange={e=>{const f=e.target.files&&e.target.files[0]; lerArquivo(f); e.target.value="";}} />
+              </label>
+              {pdfMsg&&<p className="mt-2 text-center text-xs text-slate-600">{pdfMsg}</p>}
             </div>
-            <input className={input+" mt-3"} placeholder="outros achados" value={p.exLivre} onChange={e=>set("exLivre",e.target.value)} />
+            {EXGRUPOS.map(([g,arr])=>(
+              <div key={g}>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{g}</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {arr.map(([k,l])=>(
+                    <div key={k}>
+                      <label className="block text-[11px] text-slate-500 mb-0.5">{l}</label>
+                      <input className={input+" px-2 py-1.5"} value={ex[k]||""} onChange={e=>setE(k,e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div><label className="block text-sm text-slate-600 mb-1">Campo de atenção — exames alterados</label><textarea className={input+" min-h-[60px] text-xs"} value={p.exAlt} onChange={e=>set("exAlt",e.target.value)} placeholder="preenchido ao ler o exame; pode editar" /></div>
+            <input className={input} placeholder="outros achados" value={p.exLivre} onChange={e=>set("exLivre",e.target.value)} />
           </div>
+
           <div><label className="block text-sm text-slate-600 mb-1">Capacidade funcional</label><select className={input} value={p.funcional} onChange={e=>set("funcional",e.target.value)}><option value="ge4">≥4 METs — sobe escada sem sintoma</option><option value="lt4">&lt;4 METs — dispneia leve</option><option value="desconhecido">Não avaliada</option></select></div>
           <div>
             <p className="text-sm text-slate-600 mb-2">STOP-BANG (marque os presentes)</p>
@@ -188,11 +260,23 @@ CÁLCULOS: STOP-BANG ${stop.s}/8 (${stop.band.label}); LAST ${last.ok?last.mgkg.
             {!podeGerar&&!loading&&<p className="mt-2 text-xs text-slate-400">Informe ao menos idade e peso.</p>}
             {erro&&<p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{erro}</p>}
           </div>
-          {laudo&&(
+          {laudoClin&&(
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              {tag&&<div className={"mb-3 rounded-md border px-3 py-2 text-sm font-semibold "+tagCls}>Recomendação: {tag}</div>}
-              <div className="space-y-1 text-sm leading-relaxed text-slate-700">{laudo.split("\n").map((ln,i)=>ln.startsWith("# ")?<h4 key={i} className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-teal-700">{ln.slice(2)}</h4>:ln.trim()?<p key={i} className={ln.startsWith("-")?"pl-3 -indent-3":""}>{ln}</p>:<div key={i} className="h-1" />)}</div>
+              <div className="mb-2 flex items-center justify-between">
+                {tag?<div className={"rounded-md border px-3 py-1 text-sm font-semibold "+tagCls}>Recomendação: {tag}</div>:<span />}
+                <button onClick={()=>copiar(laudoClin,"laudo")} className="text-xs text-teal-700 hover:underline">{copiado==="laudo"?"Copiado ✓":"Copiar laudo"}</button>
+              </div>
+              <div className="space-y-1 text-sm leading-relaxed text-slate-700">{laudoClin.split("\n").map((ln,i)=>ln.startsWith("# ")?<h4 key={i} className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-teal-700">{ln.slice(2)}</h4>:ln.trim()?<p key={i} className={ln.startsWith("-")?"pl-3 -indent-3":""}>{ln}</p>:<div key={i} className="h-1" />)}</div>
               <button onClick={salvar} className="mt-4 w-full rounded-md border border-teal-600 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50">{salvo?"Salvo no histórico ✓":"Salvar no histórico"}</button>
+            </div>
+          )}
+          {feegow&&(
+            <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-700">Para colar no Feegow</span>
+                <button onClick={()=>copiar(feegow,"feegow")} className="rounded-md border border-teal-600 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">{copiado==="feegow"?"Copiado ✓":"Copiar tudo"}</button>
+              </div>
+              <pre className="whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-slate-700">{feegow}</pre>
             </div>
           )}
           <p className="px-1 text-[11px] leading-snug text-slate-400">Apoio à decisão gerado por IA. Confira cada conduta, confirme tempos de suspensão na diretriz vigente e registre a decisão final sob sua responsabilidade.</p>
@@ -250,8 +334,6 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 </script>
 
 <script>
-  // Compila o código acima com o runtime CLÁSSICO explícito (usa React.createElement,
-  // sem injetar import) — elimina o conflito de runtime do Babel.
   (function () {
     try {
       var src = document.getElementById("appsrc").textContent;

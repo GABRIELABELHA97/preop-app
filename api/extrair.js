@@ -1,0 +1,103 @@
+// ============================================================
+// /api/extrair  — Serverless function (Vercel, Node)
+// Recebe o PDF ou IMAGEM de um exame laboratorial em base64,
+// pede ao Claude para LER e devolver os valores de forma estruturada,
+// já sinalizando o que está ALTERADO em relação à referência impressa.
+// NÃO interpreta nem dá conduta aqui — isso é papel do /api/avaliar.
+// Esconde a ANTHROPIC_API_KEY e valida o login (token Supabase).
+// ============================================================
+
+const EXTRACAO_PROMPT = `Você lê UM exame laboratorial (PDF ou imagem/foto) e devolve os valores de forma estruturada.
+
+REGRAS:
+- Responda APENAS com JSON válido. Sem markdown, sem crases, sem texto antes ou depois.
+- NÃO interprete, NÃO dê conduta, NÃO diagnostique. Só extraia o que está escrito.
+- Para cada exame, compare o valor com a faixa de referência IMPRESSA no próprio laudo. Se estiver fora dela, inclua em "alterados".
+- Se um campo não existir no laudo, use null. Nunca invente número.
+- Use ponto como separador decimal (ex.: "1.4"). Sorologias podem ser texto ("Não reagente", "Reagente").
+
+Mapeie estes campos (aceite sinônimos em português). A CHAVE do JSON é o código à esquerda:
+hemacias=Hemácias | hb=Hemoglobina | gl=Leucócitos/Global de leucócitos | plq=Plaquetas
+rni=RNI/INR/Coagulograma | ptta=PTTA/TTPA
+glic=Glicose de jejum | hba1c=Hemoglobina glicada/HbA1c
+tgo=TGO/AST | tgp=TGP/ALT | fa=Fosfatase alcalina/FA | ggt=GGT
+bilit=Bilirrubina total | bilid=Bilirrubina direta | biliid=Bilirrubina indireta
+cr=Creatinina | ur=Ureia/Uréia | tfg=TFG/eGFR/RFG estimado | k=Potássio
+tsh=TSH | t4l=T4 livre/T4L | antitpo=Anti-TPO | pth=PTH
+testot=Testosterona total | testol=Testosterona livre | dht=DHT
+b12=Vitamina B12 | vitd=Vitamina D/25-OH | ferrit=Ferritina | zinco=Zinco
+antihbs=Anti-HBs | hbsag=HBsAg | antihiv=Anti-HIV | antihcv=Anti-HCV | vdrl=VDRL
+
+Esquema EXATO do JSON:
+{
+  "idade": número ou null,
+  "sexo": "M" | "F" | null,
+  "ex": { "<chave>": "texto com valor e unidade" , ... só as chaves encontradas },
+  "alterados": [ { "nome": "texto", "valor": "texto", "unidade": "texto", "referencia": "texto", "direcao": "alto"|"baixo"|"anormal" } ],
+  "outros": "achados relevantes fora da lista acima, separados por ; — ou string vazia"
+}
+
+IMPORTANTE: "alterados" deve conter TODOS os valores fora da referência, inclusive os que não estão na lista mapeada. É a informação mais importante.`;
+
+function extrairJSON(txt) {
+  if (!txt) return null;
+  let s = txt.trim().replace(/^```(json)?/i, "").replace(/```$/, "").trim();
+  const i = s.indexOf("{"), j = s.lastIndexOf("}");
+  if (i === -1 || j === -1) return null;
+  try { return JSON.parse(s.slice(i, j + 1)); } catch { return null; }
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido" });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const supaUrl = process.env.SUPABASE_URL;
+  const supaAnon = process.env.SUPABASE_ANON_KEY;
+  if (!apiKey || !supaUrl || !supaAnon) {
+    return res.status(500).json({ error: "Servidor não configurado (variáveis de ambiente ausentes)." });
+  }
+
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "Não autenticado." });
+  try {
+    const u = await fetch(`${supaUrl}/auth/v1/user`, { headers: { apikey: supaAnon, Authorization: `Bearer ${token}` } });
+    if (!u.ok) return res.status(401).json({ error: "Sessão inválida." });
+  } catch {
+    return res.status(401).json({ error: "Falha ao validar a sessão." });
+  }
+
+  const { base64, mediaType } = req.body || {};
+  if (!base64 || typeof base64 !== "string") return res.status(400).json({ error: "Arquivo ausente." });
+  const tipo = mediaType || "application/pdf";
+
+  const docBlock = tipo === "application/pdf"
+    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } }
+    : { type: "image", source: { type: "base64", media_type: tipo, data: base64 } };
+
+  const payload = {
+    model: "claude-sonnet-4-6",
+    max_tokens: 2000,
+    system: EXTRACAO_PROMPT,
+    messages: [{ role: "user", content: [docBlock, { type: "text", text: "Extraia os valores deste exame no formato JSON especificado." }] }],
+  };
+
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      return res.status(502).json({ error: `Erro da API (${r.status})`, detail: t.slice(0, 300) });
+    }
+    const data = await r.json();
+    const txt = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
+    const parsed = extrairJSON(txt);
+    if (!parsed) return res.status(502).json({ error: "Não consegui ler os valores. Tente um arquivo mais nítido ou preencha à mão." });
+    return res.status(200).json({ extraido: parsed });
+  } catch (e) {
+    return res.status(500).json({ error: "Falha ao ler o exame.", detail: String(e).slice(0, 200) });
+  }
+}
