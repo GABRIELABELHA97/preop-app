@@ -39,6 +39,16 @@ Esquema EXATO do JSON:
 
 IMPORTANTE: "alterados" deve conter TODOS os valores fora da referência, inclusive os que não estão na lista mapeada. É a informação mais importante.`;
 
+const ECG_PROMPT = `Você é cardiologista e faz um laudo CURTO e SINTÉTICO de um ECG a partir da imagem enviada. Apoio à decisão — o médico assina.
+Responda em português, no máximo ~8 linhas, nesta estrutura:
+Ritmo: (sinusal/FA/outro)
+Frequência: (aprox., bpm)
+Eixo: (normal/desvio)
+Intervalos/Condução: (PR, QRS, QTc se avaliáveis; bloqueios)
+Achados: (sobrecargas, isquemia, alterações de ST-T, extrassístoles, etc.; ou "sem alterações significativas")
+SINAIS DE ALERTA: (liste o que contraindica ou exige esclarecimento antes de cirurgia eletiva — ex.: BRE novo, arritmia não esclarecida, BAV avançado, isquemia; ou "nenhum")
+Se a imagem não permitir leitura confiável (tremida, cortada, sem calibração), diga isso claramente e não invente achados.`;
+
 function extrairJSON(txt) {
   if (!txt) return null;
   let s = txt.trim().replace(/^```(json)?/i, "").replace(/```$/, "").trim();
@@ -67,13 +77,37 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Falha ao validar a sessão." });
   }
 
-  const { base64, mediaType } = req.body || {};
+  const { base64, mediaType, modo } = req.body || {};
   if (!base64 || typeof base64 !== "string") return res.status(400).json({ error: "Arquivo ausente." });
   const tipo = mediaType || "application/pdf";
 
   const docBlock = tipo === "application/pdf"
     ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } }
     : { type: "image", source: { type: "base64", media_type: tipo, data: base64 } };
+
+  // ---- modo ECG: laudo curto e sintético ----
+  if (modo === "ecg") {
+    const payloadEcg = {
+      model: "claude-sonnet-4-6",
+      max_tokens: 700,
+      system: ECG_PROMPT,
+      messages: [{ role: "user", content: [docBlock, { type: "text", text: "Faça o laudo sintético deste ECG." }] }],
+    };
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify(payloadEcg),
+      });
+      if (!r.ok) { const t = await r.text(); return res.status(502).json({ error: `Erro da API (${r.status})`, detail: t.slice(0, 300) }); }
+      const data = await r.json();
+      const ecg = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+      if (!ecg) return res.status(502).json({ error: "Não consegui ler o ECG. Tente uma foto mais nítida." });
+      return res.status(200).json({ ecg });
+    } catch (e) {
+      return res.status(500).json({ error: "Falha ao ler o ECG.", detail: String(e).slice(0, 200) });
+    }
+  }
 
   const payload = {
     model: "claude-sonnet-4-6",
