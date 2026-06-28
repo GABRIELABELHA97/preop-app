@@ -50,19 +50,7 @@ const input = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text
 const num = (v) => (v === "" || v == null ? NaN : Number(v));
 function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]||"");r.onerror=()=>rej(new Error("Falha ao ler o arquivo"));r.readAsDataURL(file);});}
 
-const FEEGOW_LABELS = ["DECISÃO","EXAMES ALTERADOS","RISCO CIRÚRGICO","COURO CABELUDO","EF","CONDUTA","ORIENTAÇÕES AO PACIENTE"];
 const SCALP = [["seborreica","Dermatite seborreica"],["foliculite","Foliculite"],["exantema","Exantema"]];
-function parseFeegow(raw){
-  const out={}; let cur=null;
-  raw.split("\n").forEach(line=>{
-    const m=line.match(/^([A-ZÇÃÁÉÍÓÚÀÂÊÔÕ /]+):\s*(.*)$/);
-    const lbl=m?FEEGOW_LABELS.find(l=>m[1].trim().startsWith(l)):null;
-    if(lbl){ cur=lbl; out[cur]=(m[2]||""); }
-    else if(cur!=null){ out[cur]=(out[cur]?out[cur]+"\n":"")+line; }
-  });
-  Object.keys(out).forEach(k=>out[k]=out[k].trim());
-  return out;
-}
 
 function Auth() {
   const [email,setEmail]=useState(""); const [senha,setSenha]=useState(""); const [modo,setModo]=useState("entrar");
@@ -102,7 +90,6 @@ function Avaliacao({ session }) {
 
   const imc=useMemo(()=>{const h=num(p.altura)/100,w=num(p.peso);return h>0&&w>0?w/(h*h):NaN;},[p.altura,p.peso]);
 
-  // TFG estimada — CKD-EPI 2021 (sem raça), a partir de creatinina, idade e sexo
   const tfgCalc=useMemo(()=>{
     const cr=parseFloat(String(ex.cr||"").replace(",",".").replace(/[^0-9.]/g,""));
     const age=num(p.idade);
@@ -112,7 +99,6 @@ function Avaliacao({ session }) {
     if(fem) e*=1.012;
     return Math.round(e);
   },[ex.cr,p.idade,p.sexo]);
-  // preenche o campo TFG automaticamente quando estiver vazio (respeita valor do laudo/edição)
   useEffect(()=>{ if(tfgCalc&&!(ex.tfg&&String(ex.tfg).trim())) setEx(prev=>({...prev,tfg:String(tfgCalc)})); },[tfgCalc]);
 
   async function lerArquivo(file){
@@ -209,14 +195,12 @@ ECG (laudo da imagem enviada): ${ecg.trim()||"não enviado"}`;
 
   function copiar(txt,qual){ try{ navigator.clipboard.writeText(txt).then(()=>{setCopiado(qual);setTimeout(()=>setCopiado(""),1500);}); }catch(e){} }
 
-  // ---- parse do laudo ----
   const exBlock=(laudo.match(/===EXAMES===([\s\S]*?)===FIM===/i)||[])[1]||"";
   const examRows=exBlock.trim().split("\n").map(s=>s.trim()).filter(s=>s&&s.includes("|"))
-    .map(line=>{const c=line.split("|").map(x=>x.trim());return {grav:(c[0]||"").toLowerCase(),exame:c[1]||"",hip:c[2]||"",motivo:c[3]||"",conduta:c[4]||"";};})
     .map(line=>{const c=line.split("|").map(x=>x.trim());return {grav:(c[0]||"").toLowerCase(),exame:c[1]||"",hip:c[2]||"",motivo:c[3]||"",conduta:c[4]||""};})
+    .filter(r=>r.grav!=="nenhum");
   const partes=laudo.split(/---\s*FEEGOW\s*---/i);
   const clin=(partes[0]||"").replace(/===EXAMES===[\s\S]*?===FIM===/i,"").replace(/^\s*DECIS[ÃA]O:[^\n]*\n?/i,"").trim();
-  const fg=parseFeegow((partes[1]||"").trim());
   const decRaw=((laudo.match(/DECIS[ÃA]O:\s*(CIRURGIA LIBERADA|INVESTIGAR[^\n]*|CIRURGIA NEGADA)/i)||[])[1]||"").toUpperCase();
   const dec=decRaw.includes("LIBERADA")?"liberada":decRaw.includes("NEGADA")?"negada":decRaw.includes("INVESTIGAR")?"investigar":"";
   const decCfg={liberada:{txt:"CIRURGIA LIBERADA",cls:"border-emerald-300 bg-emerald-50 text-emerald-800"},investigar:{txt:"INVESTIGAR ALTERAÇÃO",cls:"border-amber-300 bg-amber-50 text-amber-800"},negada:{txt:"CIRURGIA NEGADA",cls:"border-red-300 bg-red-50 text-red-800"}}[dec];
