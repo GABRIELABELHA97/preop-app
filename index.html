@@ -90,16 +90,30 @@ function Auth() {
 }
 
 function Avaliacao({ session }) {
-  const [p,setP]=useState({codigo:"",idade:"",sexo:"M",altura:"",peso:"",medicacoes:"",exAlt:"",exLivre:"",funcional:"desconhecido",scalpObs:""});
+  const [p,setP]=useState({codigo:"",idade:"",sexo:"M",altura:"",peso:"",dataCirurgia:"",tabagismo:"",etilismo:"",alergia:"",medicacoes:"",exAlt:"",exLivre:"",funcional:"desconhecido",scalpObs:""});
   const [scalp,setScalp]=useState({});
   const [ex,setEx]=useState({});
   const [comorb,setComorb]=useState({}); const [usarBusca,setUsarBusca]=useState(true);
   const [loading,setLoading]=useState(false); const [erro,setErro]=useState(""); const [laudo,setLaudo]=useState(""); const [salvo,setSalvo]=useState(false);
   const [pdfBusy,setPdfBusy]=useState(false); const [pdfMsg,setPdfMsg]=useState(""); const [copiado,setCopiado]=useState("");
+  const [ecg,setEcg]=useState(""); const [ecgBusy,setEcgBusy]=useState(false); const [ecgMsg,setEcgMsg]=useState("");
   const set=(k,v)=>setP(s=>({...s,[k]:v}));
   const setE=(k,v)=>setEx(s=>({...s,[k]:v}));
 
   const imc=useMemo(()=>{const h=num(p.altura)/100,w=num(p.peso);return h>0&&w>0?w/(h*h):NaN;},[p.altura,p.peso]);
+
+  // TFG estimada — CKD-EPI 2021 (sem raça), a partir de creatinina, idade e sexo
+  const tfgCalc=useMemo(()=>{
+    const cr=parseFloat(String(ex.cr||"").replace(",",".").replace(/[^0-9.]/g,""));
+    const age=num(p.idade);
+    if(!(cr>0&&age>0)||(p.sexo!=="M"&&p.sexo!=="F")) return null;
+    const fem=p.sexo==="F", k=fem?0.7:0.9, a=fem?-0.241:-0.302, r=cr/k;
+    let e=142*Math.pow(Math.min(r,1),a)*Math.pow(Math.max(r,1),-1.200)*Math.pow(0.9938,age);
+    if(fem) e*=1.012;
+    return Math.round(e);
+  },[ex.cr,p.idade,p.sexo]);
+  // preenche o campo TFG automaticamente quando estiver vazio (respeita valor do laudo/edição)
+  useEffect(()=>{ if(tfgCalc&&!(ex.tfg&&String(ex.tfg).trim())) setEx(prev=>({...prev,tfg:String(tfgCalc)})); },[tfgCalc]);
 
   async function lerArquivo(file){
     if(!file) return;
@@ -132,12 +146,35 @@ function Avaliacao({ session }) {
     finally{ setPdfBusy(false); }
   }
 
+  async function lerECG(file){
+    if(!file) return;
+    setEcgMsg("");
+    const ok=["image/jpeg","image/png","image/webp"];
+    if(!ok.includes(file.type)){ setEcgMsg("Envie uma FOTO do ECG (JPG, PNG ou WEBP)."); return; }
+    if(file.size>4*1024*1024){ setEcgMsg("Imagem grande demais (máx. 4 MB)."); return; }
+    setEcgBusy(true);
+    try{
+      const base64=await fileToB64(file);
+      const { data:{ session:s } }=await sb.auth.getSession();
+      const r=await fetch("/api/extrair",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${s.access_token}`},body:JSON.stringify({base64,mediaType:file.type,modo:"ecg"})});
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error||"Falha ao ler o ECG");
+      setEcg((j.ecg||"").trim());
+      setEcgMsg("Laudo gerado ✓ — confira abaixo. Entra na avaliação automaticamente.");
+    }catch(e){ setEcgMsg(e.message); }
+    finally{ setEcgBusy(false); }
+  }
+
   function montarDados(){
     const co=COMORB.filter(([k])=>comorb[k]).map(([,l])=>l);
     const exLin=EXFLAT.filter(([k])=>ex[k]&&String(ex[k]).trim()).map(([k,l])=>`${l} ${ex[k]}`).join("; ");
     const fmap={ge4:"≥4 METs",lt4:"<4 METs (dispneia leve)",desconhecido:"não avaliada"};
     return `PACIENTE (pseudonimizado, código ${p.codigo||"?"})
 Idade ${p.idade||"?"} | Sexo ${p.sexo} | Peso ${p.peso||"?"} kg | IMC ${Number.isFinite(imc)?imc.toFixed(1):"?"}
+Data prevista da cirurgia: ${p.dataCirurgia||"a confirmar"}
+Tabagismo: ${p.tabagismo.trim()||"nega"}
+Etilismo: ${p.etilismo.trim()||"nega"}
+Alergia prévia: ${p.alergia.trim()||"nega"}
 Comorbidades: ${co.join(", ")||"nenhuma referida"}
 Capacidade funcional: ${fmap[p.funcional]}
 Medicações:
@@ -145,7 +182,8 @@ ${p.medicacoes.trim()||"(não informadas)"}
 Exames: ${exLin||"(não informados)"}
 Exames ALTERADOS (campo de atenção): ${p.exAlt.trim()||"(nenhum sinalizado)"}
 Outros achados: ${p.exLivre.trim()||"—"}
-Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.trim()].filter(Boolean).join("; ")||"sem alteração relatada"}`;
+Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.trim()].filter(Boolean).join("; ")||"sem alteração relatada"}
+ECG (laudo da imagem enviada): ${ecg.trim()||"não enviado"}`;
   }
 
   async function gerar(){
@@ -171,9 +209,10 @@ Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.t
 
   function copiar(txt,qual){ try{ navigator.clipboard.writeText(txt).then(()=>{setCopiado(qual);setTimeout(()=>setCopiado(""),1500);}); }catch(e){} }
 
+  // ---- parse do laudo ----
   const exBlock=(laudo.match(/===EXAMES===([\s\S]*?)===FIM===/i)||[])[1]||"";
   const examRows=exBlock.trim().split("\n").map(s=>s.trim()).filter(s=>s&&s.includes("|"))
-    .map(line=>{const c=line.split("|").map(x=>x.trim());return {grav:(c[0]||"").toLowerCase(),exame:c[1]||"",hip:c[2]||"",motivo:c[3]||"",conduta:c[4]||""};})
+    .map(line=>{const c=line.split("|").map(x=>x.trim());return {grav:(c[0]||"").toLowerCase(),exame:c[1]||"",hip:c[2]||"",motivo:c[3]||"",conduta:c[4]||"";};})
     .filter(r=>r.grav!=="nenhum");
   const partes=laudo.split(/---\s*FEEGOW\s*---/i);
   const clin=(partes[0]||"").replace(/===EXAMES===[\s\S]*?===FIM===/i,"").replace(/^\s*DECIS[ÃA]O:[^\n]*\n?/i,"").trim();
@@ -185,15 +224,8 @@ Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.t
   const gtxt={alta:"text-red-800",media:"text-amber-800",baixa:"text-emerald-800"};
   const gtag={alta:"Atenção alta",media:"Acompanhar",baixa:"Leve"};
   const clinSections=clin.split(/\n(?=# )/).map(s=>s.trim()).filter(Boolean).map(sec=>{const nl=sec.indexOf("\n");return {titulo:(nl<0?sec:sec.slice(0,nl)).replace(/^#\s+/,"").trim(),corpo:(nl<0?"":sec.slice(nl+1)).trim()};});
-  const evolucaoCompleta=(()=>{
-    let evo=laudo.replace(/===EXAMES===([\s\S]*?)===FIM===/i,(m,inner)=>{
-      const rows=inner.trim().split("\n").map(s=>s.trim()).filter(s=>s.includes("|"));
-      const lines=rows.map(line=>{const c=line.split("|").map(x=>x.trim());if((c[0]||"").toLowerCase()==="nenhum")return "Sem alterações relevantes.";return `- ${c[1]}: ${c[2]}; motivo: ${c[3]}; conduta: ${c[4]}`;});
-      return "EXAMES ALTERADOS — LEITURA:\n"+lines.join("\n");
-    });
-    evo=evo.replace(/---\s*FEEGOW\s*---/i,"").replace(/^#\s+/gm,"").trim();
-    return `AVALIAÇÃO PRÉ-OPERATÓRIA${p.codigo?(" — "+p.codigo):""}\n\n`+evo;
-  })();
+  const evolucao=((laudo.split(/---\s*FEEGOW\s*---/i)[1])||"").trim();
+  const evolucaoCompleta=evolucao||clin;
   const podeGerar=p.idade!==""&&p.peso!==""&&!loading;
 
   return (
@@ -211,6 +243,12 @@ Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.t
             <div><label className="block text-sm text-slate-600 mb-1">Peso (kg)</label><input className={input} inputMode="numeric" value={p.peso} onChange={e=>set("peso",e.target.value)} /></div>
           </div>
           {Number.isFinite(imc)&&<p className="text-xs text-slate-500">IMC <span className="font-mono font-semibold">{imc.toFixed(1)}</span></p>}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-sm text-slate-600 mb-1">Data prevista da cirurgia</label><input type="date" className={input} value={p.dataCirurgia} onChange={e=>set("dataCirurgia",e.target.value)} /></div>
+            <div><label className="block text-sm text-slate-600 mb-1">Tabagismo</label><input className={input} value={p.tabagismo} onChange={e=>set("tabagismo",e.target.value)} placeholder="nega / social / nº cig." /></div>
+            <div><label className="block text-sm text-slate-600 mb-1">Etilismo</label><input className={input} value={p.etilismo} onChange={e=>set("etilismo",e.target.value)} placeholder="nega / social" /></div>
+            <div><label className="block text-sm text-slate-600 mb-1">Alergia prévia</label><input className={input} value={p.alergia} onChange={e=>set("alergia",e.target.value)} placeholder="nega / qual" /></div>
+          </div>
           <div>
             <p className="text-sm text-slate-600 mb-2">Comorbidades</p>
             <div className="flex flex-wrap gap-2">{COMORB.map(([k,l])=><button key={k} onClick={()=>setComorb(s=>({...s,[k]:!s[k]}))} className={"rounded-full border px-3 py-1.5 text-sm "+(comorb[k]?"border-teal-600 bg-teal-50 text-teal-800":"border-slate-300 text-slate-600")}>{l}</button>)}</div>
@@ -221,6 +259,16 @@ Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.t
             <p className="text-sm text-slate-600 mb-2">Couro cabeludo</p>
             <div className="flex flex-wrap gap-2 mb-2">{SCALP.map(([k,l])=><button key={k} onClick={()=>setScalp(s=>({...s,[k]:!s[k]}))} className={"rounded-full border px-3 py-1.5 text-sm "+(scalp[k]?"border-teal-600 bg-teal-50 text-teal-800":"border-slate-300 text-slate-600")}>{l}</button>)}</div>
             <input className={input} placeholder="outros achados do couro cabeludo (opcional)" value={p.scalpObs} onChange={e=>set("scalpObs",e.target.value)} />
+          </div>
+
+          <div>
+            <p className="text-sm text-slate-600 mb-2">Eletrocardiograma (foto)</p>
+            <label className={"flex items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 py-3 text-sm cursor-pointer "+(ecgBusy?"border-slate-200 text-slate-400":"border-teal-300 text-teal-700 hover:bg-teal-50")}>
+              {ecgBusy?"Lendo o ECG…":"📷 Enviar foto do ECG → laudo automático"}
+              <input type="file" accept="image/*" className="hidden" disabled={ecgBusy} onChange={e=>{const f=e.target.files&&e.target.files[0]; if(f) lerECG(f); e.target.value="";}} />
+            </label>
+            {ecgMsg&&<p className="text-[11px] text-slate-500 mt-1">{ecgMsg}</p>}
+            {ecg&&<div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="flex items-center justify-between mb-1"><span className="text-xs font-semibold text-slate-700">Laudo do ECG</span><button onClick={()=>{setEcg("");setEcgMsg("");}} className="text-[11px] text-slate-400 hover:text-red-500">remover</button></div><pre className="whitespace-pre-wrap font-sans text-xs text-slate-700">{ecg}</pre></div>}
           </div>
 
           <div className="space-y-3 border-t border-slate-100 pt-4">
@@ -246,6 +294,7 @@ Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.t
                 </div>
               </div>
             ))}
+            {tfgCalc&&<p className="text-[11px] text-slate-500">TFG estimada (CKD-EPI 2021): <span className="font-mono font-semibold">{tfgCalc}</span> mL/min/1,73m² — preenchida automaticamente; edite se o laudo trouxer outro valor.</p>}
             <div><label className="block text-sm text-slate-600 mb-1">Campo de atenção — exames alterados</label><textarea className={input+" min-h-[60px] text-xs"} value={p.exAlt} onChange={e=>set("exAlt",e.target.value)} placeholder="preenchido ao ler o exame; pode editar" /></div>
             <input className={input} placeholder="outros achados" value={p.exLivre} onChange={e=>set("exLivre",e.target.value)} />
           </div>
@@ -300,16 +349,8 @@ Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.t
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-700">Laudo — formato Feegow</span>
                 <button onClick={()=>copiar(evolucaoCompleta,"tudo")} className="rounded-md border border-teal-600 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">{copiado==="tudo"?"Copiado ✓":"Copiar evolução"}</button>
               </div>
-              <div className="space-y-3">
-                {FEEGOW_LABELS.map(l=> fg[l] ? (
-                  <div key={l} className="rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{l}</span>
-                      <button onClick={()=>copiar(fg[l],l)} className="text-[11px] text-teal-700 hover:underline">{copiado===l?"copiado ✓":"copiar"}</button>
-                    </div>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{fg[l]}</p>
-                  </div>
-                ) : null)}
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">{evolucao||evolucaoCompleta}</pre>
               </div>
               <button onClick={salvar} className="mt-4 w-full rounded-md border border-teal-600 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50">{salvo?"Salvo no histórico ✓":"Salvar no histórico"}</button>
             </div>
