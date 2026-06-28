@@ -129,7 +129,7 @@ export default async function handler(req, res) {
   const { dados, usarBusca } = req.body || {};
   if (!dados || typeof dados !== "string") return res.status(400).json({ error: "Dados ausentes." });
 
-  const payload = { model: "claude-sonnet-4-6", max_tokens: 3600, system: SYSTEM_PROMPT, messages: [{ role: "user", content: dados }] };
+  const payload = { model: "claude-sonnet-4-6", max_tokens: 8000, system: SYSTEM_PROMPT, messages: [{ role: "user", content: dados }] };
   if (usarBusca) payload.tools = [{ type: "web_search_20250305", name: "web_search" }];
 
   try {
