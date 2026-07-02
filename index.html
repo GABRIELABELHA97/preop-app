@@ -85,11 +85,13 @@ function Avaliacao({ session }) {
   const [loading,setLoading]=useState(false); const [erro,setErro]=useState(""); const [laudo,setLaudo]=useState(""); const [salvo,setSalvo]=useState(false);
   const [pdfBusy,setPdfBusy]=useState(false); const [pdfMsg,setPdfMsg]=useState(""); const [copiado,setCopiado]=useState("");
   const [ecg,setEcg]=useState(""); const [ecgBusy,setEcgBusy]=useState(false); const [ecgMsg,setEcgMsg]=useState("");
+  const [cardio,setCardio]=useState(""); const [cardioBusy,setCardioBusy]=useState(false); const [cardioMsg,setCardioMsg]=useState("");
   const set=(k,v)=>setP(s=>({...s,[k]:v}));
   const setE=(k,v)=>setEx(s=>({...s,[k]:v}));
 
   const imc=useMemo(()=>{const h=num(p.altura)/100,w=num(p.peso);return h>0&&w>0?w/(h*h):NaN;},[p.altura,p.peso]);
 
+  // TFG estimada — CKD-EPI 2021 (sem raça), a partir de creatinina, idade e sexo
   const tfgCalc=useMemo(()=>{
     const cr=parseFloat(String(ex.cr||"").replace(",",".").replace(/[^0-9.]/g,""));
     const age=num(p.idade);
@@ -99,36 +101,45 @@ function Avaliacao({ session }) {
     if(fem) e*=1.012;
     return Math.round(e);
   },[ex.cr,p.idade,p.sexo]);
+  // preenche o campo TFG automaticamente quando estiver vazio (respeita valor do laudo/edição)
   useEffect(()=>{ if(tfgCalc&&!(ex.tfg&&String(ex.tfg).trim())) setEx(prev=>({...prev,tfg:String(tfgCalc)})); },[tfgCalc]);
 
-  async function lerArquivo(file){
-    if(!file) return;
-    setPdfMsg("");
+  async function lerArquivos(files){
+    const lista=Array.from(files||[]).filter(Boolean);
+    if(!lista.length) return;
+    setPdfMsg(""); setPdfBusy(true);
     const ok=["application/pdf","image/jpeg","image/png","image/webp"];
-    if(!ok.includes(file.type)){ setPdfMsg("Use PDF, JPG, PNG ou WEBP."); return; }
-    if(file.size>4*1024*1024){ setPdfMsg("Arquivo grande demais (máx. 4 MB). Comprima ou fotografe em partes."); return; }
-    setPdfBusy(true);
+    let lidos=0, alterTotal=0, erros=[];
     try{
-      const base64=await fileToB64(file);
       const { data:{ session:s } }=await sb.auth.getSession();
-      const r=await fetch("/api/extrair",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${s.access_token}`},body:JSON.stringify({base64,mediaType:file.type})});
-      const j=await r.json();
-      if(!r.ok) throw new Error(j.error||"Falha ao ler");
-      const d=j.extraido||{};
-      if(d.ex&&typeof d.ex==="object") setEx(prev=>({...prev,...d.ex}));
-      setP(prev=>{
-        const np={...prev};
-        if(d.idade&&!prev.idade) np.idade=String(d.idade);
-        if(d.sexo==="M"||d.sexo==="F") np.sexo=d.sexo;
-        if(Array.isArray(d.alterados)&&d.alterados.length){
-          np.exAlt=d.alterados.map(a=>`${a.nome}: ${a.valor||""}${a.unidade?" "+a.unidade:""}${a.referencia?" (ref "+a.referencia+")":""}${a.direcao?" ["+a.direcao+"]":""}`).join("\n");
-        }
-        if(d.outros) np.exLivre=d.outros;
-        return np;
-      });
-      const n=Array.isArray(d.alterados)?d.alterados.length:0;
-      setPdfMsg("Lido ✓ — campos preenchidos."+(n?` ${n} valor(es) alterado(s) detectado(s).`:"")+" Confira antes de gerar.");
-    }catch(e){ setPdfMsg(e.message); }
+      for(let i=0;i<lista.length;i++){
+        const file=lista[i];
+        setPdfMsg(`Lendo arquivo ${i+1} de ${lista.length}…`);
+        if(!ok.includes(file.type)){ erros.push(`${file.name}: use PDF, JPG, PNG ou WEBP`); continue; }
+        if(file.size>3*1024*1024){ erros.push(`${file.name}: grande demais (máx. 3 MB)`); continue; }
+        try{
+          const base64=await fileToB64(file);
+          const r=await fetch("/api/extrair",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${s.access_token}`},body:JSON.stringify({base64,mediaType:file.type})});
+          const j=await r.json();
+          if(!r.ok) throw new Error(j.error||"Falha ao ler");
+          const d=j.extraido||{};
+          if(d.ex&&typeof d.ex==="object") setEx(prev=>({...prev,...d.ex}));
+          setP(prev=>{
+            const np={...prev};
+            if(d.idade&&!prev.idade) np.idade=String(d.idade);
+            if(d.sexo==="M"||d.sexo==="F") np.sexo=d.sexo;
+            if(Array.isArray(d.alterados)&&d.alterados.length){
+              const novas=d.alterados.map(a=>`${a.nome}: ${a.valor||""}${a.unidade?" "+a.unidade:""}${a.referencia?" (ref "+a.referencia+")":""}${a.direcao?" ["+a.direcao+"]":""}`).join("\n");
+              np.exAlt=prev.exAlt?prev.exAlt+"\n"+novas:novas;
+            }
+            if(d.outros) np.exLivre=prev.exLivre?prev.exLivre+"; "+d.outros:d.outros;
+            return np;
+          });
+          lidos++; alterTotal+=Array.isArray(d.alterados)?d.alterados.length:0;
+        }catch(e){ erros.push(`${file.name}: ${e.message}`); }
+      }
+      setPdfMsg(`${lidos} de ${lista.length} arquivo(s) lido(s) ✓`+(alterTotal?` — ${alterTotal} valor(es) alterado(s).`:".")+(erros.length?` Problemas: ${erros.join(" | ")}`:"")+" Confira antes de gerar.");
+    }
     finally{ setPdfBusy(false); }
   }
 
@@ -137,7 +148,7 @@ function Avaliacao({ session }) {
     setEcgMsg("");
     const ok=["image/jpeg","image/png","image/webp"];
     if(!ok.includes(file.type)){ setEcgMsg("Envie uma FOTO do ECG (JPG, PNG ou WEBP)."); return; }
-    if(file.size>4*1024*1024){ setEcgMsg("Imagem grande demais (máx. 4 MB)."); return; }
+    if(file.size>3*1024*1024){ setEcgMsg("Imagem grande demais (máx. 3 MB)."); return; }
     setEcgBusy(true);
     try{
       const base64=await fileToB64(file);
@@ -151,13 +162,36 @@ function Avaliacao({ session }) {
     finally{ setEcgBusy(false); }
   }
 
+  async function lerCardio(file){
+    if(!file) return;
+    setCardioMsg("");
+    const ok=["application/pdf","image/jpeg","image/png","image/webp"];
+    if(!ok.includes(file.type)){ setCardioMsg("Use PDF ou foto (JPG, PNG, WEBP)."); return; }
+    if(file.size>3*1024*1024){ setCardioMsg("Arquivo grande demais (máx. 3 MB)."); return; }
+    setCardioBusy(true);
+    try{
+      const base64=await fileToB64(file);
+      const { data:{ session:s } }=await sb.auth.getSession();
+      const r=await fetch("/api/extrair",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${s.access_token}`},body:JSON.stringify({base64,mediaType:file.type,modo:"cardio"})});
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error||"Falha ao ler o laudo");
+      setCardio((j.ecg||"").trim());
+      setCardioMsg("Laudo resumido ✓ — entra na avaliação automaticamente.");
+    }catch(e){ setCardioMsg(e.message); }
+    finally{ setCardioBusy(false); }
+  }
+
   function montarDados(){
     const co=COMORB.filter(([k])=>comorb[k]).map(([,l])=>l);
     const exLin=EXFLAT.filter(([k])=>ex[k]&&String(ex[k]).trim()).map(([k,l])=>`${l} ${ex[k]}`).join("; ");
     const fmap={ge4:"≥4 METs",lt4:"<4 METs (dispneia leve)",desconhecido:"não avaliada"};
-    return `PACIENTE (pseudonimizado, código ${p.codigo||"?"})
-Idade ${p.idade||"?"} | Sexo ${p.sexo} | Peso ${p.peso||"?"} kg | IMC ${Number.isFinite(imc)?imc.toFixed(1):"?"}
-Data prevista da cirurgia: ${p.dataCirurgia||"a confirmar"}
+    const hoje=new Date(); const hojeStr=hoje.toLocaleDateString("pt-BR");
+    let diasCir="não informada";
+    if(p.dataCirurgia){ const dc=new Date(p.dataCirurgia+"T12:00:00"); const dd=Math.round((dc-hoje)/(1000*60*60*24)); diasCir=dd>=0?`${p.dataCirurgia.split("-").reverse().join("/")} (daqui a ${dd} dia${dd===1?"":"s"})`:`${p.dataCirurgia.split("-").reverse().join("/")} (DATA JÁ PASSOU — conferir)`; }
+    return `Data de HOJE: ${hojeStr}
+PACIENTE (pseudonimizado, código ${p.codigo||"?"})
+Idade ${p.idade||"?"} | Sexo ${p.sexo} | Altura ${p.altura||"?"} cm | Peso ${p.peso||"?"} kg | IMC ${Number.isFinite(imc)?imc.toFixed(1):"?"}
+Data prevista da cirurgia: ${diasCir}
 Tabagismo: ${p.tabagismo.trim()||"nega"}
 Etilismo: ${p.etilismo.trim()||"nega"}
 Alergia prévia: ${p.alergia.trim()||"nega"}
@@ -169,7 +203,8 @@ Exames: ${exLin||"(não informados)"}
 Exames ALTERADOS (campo de atenção): ${p.exAlt.trim()||"(nenhum sinalizado)"}
 Outros achados: ${p.exLivre.trim()||"—"}
 Couro cabeludo: ${[...SCALP.filter(([k])=>scalp[k]).map(([,l])=>l), p.scalpObs.trim()].filter(Boolean).join("; ")||"sem alteração relatada"}
-ECG (laudo da imagem enviada): ${ecg.trim()||"não enviado"}`;
+ECG (laudo da imagem enviada): ${ecg.trim()||"não enviado"}
+Laudo do cardiologista (resumo): ${cardio.trim()||"não enviado"}`;
   }
 
   async function gerar(){
@@ -195,6 +230,7 @@ ECG (laudo da imagem enviada): ${ecg.trim()||"não enviado"}`;
 
   function copiar(txt,qual){ try{ navigator.clipboard.writeText(txt).then(()=>{setCopiado(qual);setTimeout(()=>setCopiado(""),1500);}); }catch(e){} }
 
+  // ---- parse do laudo ----
   const exBlock=(laudo.match(/===EXAMES===([\s\S]*?)===FIM===/i)||[])[1]||"";
   const examRows=exBlock.trim().split("\n").map(s=>s.trim()).filter(s=>s&&s.includes("|"))
     .map(line=>{const c=line.split("|").map(x=>x.trim());return {grav:(c[0]||"").toLowerCase(),exame:c[1]||"",hip:c[2]||"",motivo:c[3]||"",conduta:c[4]||""};})
@@ -208,9 +244,22 @@ ECG (laudo da imagem enviada): ${ecg.trim()||"não enviado"}`;
   const gtxt={alta:"text-red-800",media:"text-amber-800",baixa:"text-emerald-800"};
   const gtag={alta:"Atenção alta",media:"Acompanhar",baixa:"Leve"};
   const clinSections=clin.split(/\n(?=# )/).map(s=>s.trim()).filter(Boolean).map(sec=>{const nl=sec.indexOf("\n");return {titulo:(nl<0?sec:sec.slice(0,nl)).replace(/^#\s+/,"").trim(),corpo:(nl<0?"":sec.slice(nl+1)).trim()};});
-  const evolucao=((laudo.split(/---\s*FEEGOW\s*---/i)[1])||"").trim();
+  const evolucao=((partes[1])||"").trim();
   const evolucaoCompleta=evolucao||clin;
   const podeGerar=p.idade!==""&&p.peso!==""&&!loading;
+
+  // Checklist de segurança — itens críticos antes da decisão
+  const temSoro=["antihbs","hbsag","antihiv","antihcv","vdrl"].filter(k=>ex[k]&&String(ex[k]).trim()).length;
+  const checklist=[
+    {nome:"Coagulograma (RNI/PTTA)", ok:!!((ex.rni&&String(ex.rni).trim())||(ex.ptta&&String(ex.ptta).trim())), critico:true},
+    {nome:`Sorologias (${temSoro}/5)`, ok:temSoro>=5, parcial:temSoro>0&&temSoro<5, critico:true},
+    {nome:"Hemograma (Hb/plaquetas)", ok:!!((ex.hb&&String(ex.hb).trim())&&(ex.plq&&String(ex.plq).trim())), critico:true},
+    {nome:"Função renal (creatinina)", ok:!!(ex.cr&&String(ex.cr).trim()), critico:false},
+    {nome:"Hepático (TGO/TGP)", ok:!!((ex.tgo&&String(ex.tgo).trim())||(ex.tgp&&String(ex.tgp).trim())), critico:false},
+    {nome:"ECG ou laudo cardiológico", ok:!!(ecg.trim()||cardio.trim()), critico:true},
+    {nome:"Couro cabeludo avaliado", ok:Object.values(scalp).some(Boolean)||!!p.scalpObs.trim(), critico:false, neutroSeVazio:true},
+  ];
+  const criticosFaltando=checklist.filter(c=>c.critico&&!c.ok).length;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -255,13 +304,23 @@ ECG (laudo da imagem enviada): ${ecg.trim()||"não enviado"}`;
             {ecg&&<div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="flex items-center justify-between mb-1"><span className="text-xs font-semibold text-slate-700">Laudo do ECG</span><button onClick={()=>{setEcg("");setEcgMsg("");}} className="text-[11px] text-slate-400 hover:text-red-500">remover</button></div><pre className="whitespace-pre-wrap font-sans text-xs text-slate-700">{ecg}</pre></div>}
           </div>
 
+          <div>
+            <p className="text-sm text-slate-600 mb-2">Laudo do cardiologista (PDF ou foto)</p>
+            <label className={"flex items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 py-3 text-sm cursor-pointer "+(cardioBusy?"border-slate-200 text-slate-400":"border-teal-300 text-teal-700 hover:bg-teal-50")}>
+              {cardioBusy?"Lendo o laudo…":"🩺 Enviar laudo do cardiologista → resumo automático"}
+              <input type="file" accept="application/pdf,image/*" className="hidden" disabled={cardioBusy} onChange={e=>{const f=e.target.files&&e.target.files[0]; if(f) lerCardio(f); e.target.value="";}} />
+            </label>
+            {cardioMsg&&<p className="text-[11px] text-slate-500 mt-1">{cardioMsg}</p>}
+            {cardio&&<div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="flex items-center justify-between mb-1"><span className="text-xs font-semibold text-slate-700">Resumo do laudo cardiológico</span><button onClick={()=>{setCardio("");setCardioMsg("");}} className="text-[11px] text-slate-400 hover:text-red-500">remover</button></div><pre className="whitespace-pre-wrap font-sans text-xs text-slate-700">{cardio}</pre></div>}
+          </div>
+
           <div className="space-y-3 border-t border-slate-100 pt-4">
             <p className="text-sm font-medium text-slate-700">Exames</p>
             <div className="rounded-lg border border-dashed border-teal-300 bg-teal-50/40 p-3">
               <label className="flex cursor-pointer flex-col items-center gap-1 text-center">
-                <span className="text-sm font-medium text-teal-800">{pdfBusy?"Lendo o exame…":"Enviar PDF ou foto do exame"}</span>
-                <span className="text-xs text-slate-500">Preenche os campos sozinho. PDF, JPG, PNG (máx. 4 MB).</span>
-                <input type="file" accept="application/pdf,image/*" className="hidden" disabled={pdfBusy} onChange={e=>{const f=e.target.files&&e.target.files[0]; lerArquivo(f); e.target.value="";}} />
+                <span className="text-sm font-medium text-teal-800">{pdfBusy?"Lendo…":"Enviar exames (PDF ou fotos — vários de uma vez)"}</span>
+                <span className="text-xs text-slate-500">Pode selecionar VÁRIOS de uma vez. PDF, JPG, PNG (máx. 3 MB cada).</span>
+                <input type="file" multiple accept="application/pdf,image/*" className="hidden" disabled={pdfBusy} onChange={e=>{lerArquivos(e.target.files); e.target.value="";}} />
               </label>
               {pdfMsg&&<p className="mt-2 text-center text-xs text-slate-600">{pdfMsg}</p>}
             </div>
@@ -288,6 +347,16 @@ ECG (laudo da imagem enviada): ${ecg.trim()||"não enviado"}`;
       <div className="lg:col-span-5">
         <div className="space-y-4 lg:sticky lg:top-4">
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Checklist de segurança</p>
+            <div className="mb-3 space-y-1">
+              {checklist.map((c,i)=>(
+                <div key={i} className="flex items-center justify-between text-xs">
+                  <span className={c.ok?"text-slate-600":(c.critico?"font-medium text-red-700":"text-slate-500")}>{c.nome}</span>
+                  <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold "+(c.ok?"bg-emerald-50 text-emerald-700":(c.parcial?"bg-amber-50 text-amber-700":(c.critico?"bg-red-50 text-red-700":"bg-slate-100 text-slate-500")))}>{c.ok?"✓":(c.parcial?"parcial":(c.neutroSeVazio?"não informado":"faltante"))}</span>
+                </div>
+              ))}
+            </div>
+            {criticosFaltando>0&&<p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-700">⚠ {criticosFaltando} item(ns) crítico(s) sem informação. Você pode gerar mesmo assim, mas a avaliação sairá incompleta.</p>}
             <label className="mb-3 flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={usarBusca} onChange={e=>setUsarBusca(e.target.checked)} className="h-4 w-4 accent-teal-700" /> Confirmar diretrizes na fonte</label>
             <button onClick={gerar} disabled={!podeGerar} className="w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300">{loading?"Gerando…":"Gerar avaliação"}</button>
             {!podeGerar&&!loading&&<p className="mt-2 text-xs text-slate-400">Informe ao menos idade e peso.</p>}
