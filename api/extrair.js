@@ -49,6 +49,15 @@ Achados: (sobrecargas, isquemia, alterações de ST-T, extrassístoles, etc.; ou
 SINAIS DE ALERTA: (liste o que contraindica ou exige esclarecimento antes de cirurgia eletiva — ex.: BRE novo, arritmia não esclarecida, BAV avançado, isquemia; ou "nenhum")
 Se a imagem não permitir leitura confiável (tremida, cortada, sem calibração), diga isso claramente e não invente achados.`;
 
+const CARDIO_PROMPT = `Você lê o LAUDO DE UM CARDIOLOGISTA (avaliação de risco cirúrgico pré-operatório) em PDF ou foto e devolve um resumo CURTO e fiel. Apoio à decisão — não interprete além do que está escrito.
+Responda em português, no máximo ~6 linhas, nesta estrutura:
+ECG descrito: (o que o laudo diz do ECG; ou "não descrito")
+Risco/ASA: (classificação ASA e/ou risco declarado; ou "não declarado")
+Conclusão do cardiologista: (liberado/liberado com ressalvas/não liberado + condições, fiel ao texto)
+Médico e CRM: (se legível)
+ALERTAS: (qualquer condição, restrição ou pendência citada; ou "nenhum")
+Se o documento não for um laudo cardiológico ou estiver ilegível, diga isso claramente e não invente conteúdo.`;
+
 function extrairJSON(txt) {
   if (!txt) return null;
   let s = txt.trim().replace(/^```(json)?/i, "").replace(/```$/, "").trim();
@@ -85,13 +94,13 @@ export default async function handler(req, res) {
     ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } }
     : { type: "image", source: { type: "base64", media_type: tipo, data: base64 } };
 
-  // ---- modo ECG: laudo curto e sintético ----
-  if (modo === "ecg") {
+  // ---- modos de laudo curto: ECG (imagem) e laudo cardiológico (PDF/imagem) ----
+  if (modo === "ecg" || modo === "cardio") {
     const payloadEcg = {
       model: "claude-sonnet-4-6",
       max_tokens: 700,
-      system: ECG_PROMPT,
-      messages: [{ role: "user", content: [docBlock, { type: "text", text: "Faça o laudo sintético deste ECG." }] }],
+      system: modo === "ecg" ? ECG_PROMPT : CARDIO_PROMPT,
+      messages: [{ role: "user", content: [docBlock, { type: "text", text: modo === "ecg" ? "Faça o laudo sintético deste ECG." : "Resuma este laudo cardiológico." }] }],
     };
     try {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -102,7 +111,7 @@ export default async function handler(req, res) {
       if (!r.ok) { const t = await r.text(); return res.status(502).json({ error: `Erro da API (${r.status})`, detail: t.slice(0, 300) }); }
       const data = await r.json();
       const ecg = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
-      if (!ecg) return res.status(502).json({ error: "Não consegui ler o ECG. Tente uma foto mais nítida." });
+      if (!ecg) return res.status(502).json({ error: modo === "ecg" ? "Não consegui ler o ECG. Tente uma foto mais nítida." : "Não consegui ler o laudo. Tente um arquivo mais nítido." });
       return res.status(200).json({ ecg });
     } catch (e) {
       return res.status(500).json({ error: "Falha ao ler o ECG.", detail: String(e).slice(0, 200) });
