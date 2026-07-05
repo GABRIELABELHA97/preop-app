@@ -39,15 +39,25 @@ Esquema EXATO do JSON:
 
 IMPORTANTE: "alterados" deve conter TODOS os valores fora da referência, inclusive os que não estão na lista mapeada. É a informação mais importante.`;
 
-const ECG_PROMPT = `Você é cardiologista e faz um laudo CURTO e SINTÉTICO de um ECG a partir da imagem enviada. Apoio à decisão — o médico assina.
-Responda em português, no máximo ~8 linhas, nesta estrutura:
+const ECG_PROMPT = `Você é cardiologista e faz um laudo CURTO e SINTÉTICO de um ECG a partir da imagem enviada, para apoio à decisão pré-operatória (sedação consciente + tumescente, transplante capilar). Apoio à decisão — o médico responsável decide e assina.
+
+CHECKLIST DE CALIBRAÇÃO (confira antes de qualquer leitura): velocidade (25 ou 50 mm/s), ganho (10 ou 5 mm/mV — se 5 mm/mV, dobre mentalmente as amplitudes antes de avaliar critério de voltagem), filtros, data do exame, dados demográficos (idade/sexo — os cutoffs de QTc e voltagem dependem deles).
+
+REGRA DURA DE QUALIDADE DE IMAGEM: se a imagem (tremida, cortada, com brilho, papel térmico curvo, baixa resolução) não permite medir os intervalos com confiança, NÃO estime QTc, PR, QRS ou eixo em milissegundos/graus como se fossem medidos. Nesse caso, reporte apenas a leitura automática impressa pelo aparelho para esses campos e declare a limitação em "Ressalvas". NÃO exclua com certeza alterações finas de ST-T, ondas Q sutis ou pré-excitação discreta só por causa da imagem ruim — registre a incerteza em vez de negar o achado.
+
+VIGÊNCIA: se a data impressa for antiga, ou o relógio do aparelho estiver obviamente errado, o ECG NÃO serve para o pré-op atual — sinalize isso claramente, sempre, sem deixar passar.
+
+Responda em português, no máximo ~10 linhas, nesta estrutura:
+Calibração: (velocidade/ganho/filtros — adequada ou com ressalva)
 Ritmo: (sinusal/FA/outro)
 Frequência: (aprox., bpm)
-Eixo: (normal/desvio)
-Intervalos/Condução: (PR, QRS, QTc se avaliáveis; bloqueios)
+Eixo: (normal/desvio, ou "não mensurável nesta imagem")
+Intervalos/Condução: (PR, QRS, QTc — só se avaliáveis com confiança; caso contrário, citar a leitura automática do aparelho e marcar como não confiável; bloqueios)
 Achados: (sobrecargas, isquemia, alterações de ST-T, extrassístoles, etc.; ou "sem alterações significativas")
-SINAIS DE ALERTA: (liste o que contraindica ou exige esclarecimento antes de cirurgia eletiva — ex.: BRE novo, arritmia não esclarecida, BAV avançado, isquemia; ou "nenhum")
-Se a imagem não permitir leitura confiável (tremida, cortada, sem calibração), diga isso claramente e não invente achados.`;
+Vigência: (data do exame — vigente / ATENÇÃO: data antiga ou relógio incorreto, repetir o exame)
+SINAIS DE ALERTA: (o que contraindica ou exige esclarecimento antes de cirurgia eletiva — ex.: BRE novo, arritmia não esclarecida, BAV avançado, isquemia; ou "nenhum")
+Ressalvas: (qualidade de imagem, intervalos não mensuráveis, ausência de dados demográficos, ou "nenhuma")
+Impacto na sedação: (só os aplicáveis — bradicardia × dexmedetomidina; QTc × fármacos/eletrólitos; distúrbio de condução → evitar dexmedetomidina; isquemia/sobrecarga → cautela/escalar)`;
 
 const CARDIO_PROMPT = `Você lê o LAUDO DE UM CARDIOLOGISTA (avaliação de risco cirúrgico pré-operatório) em PDF ou foto e devolve um resumo CURTO e fiel. Apoio à decisão — não interprete além do que está escrito.
 Responda em português, no máximo ~6 linhas, nesta estrutura:
