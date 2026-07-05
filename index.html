@@ -49,6 +49,13 @@ const EXFLAT = EXGRUPOS.flatMap(([,arr]) => arr);
 const input = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 focus:outline-none";
 const num = (v) => (v === "" || v == null ? NaN : Number(v));
 function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]||"");r.onerror=()=>rej(new Error("Falha ao ler o arquivo"));r.readAsDataURL(file);});}
+// reforço defensivo: o bloco Feegow deve ser texto puro (sem #, **, marcadores de lista ou linhas de tabela markdown)
+function limparMarkdown(txt){
+  return String(txt||"").split("\n").map(l=>{
+    if(/^\s*\|?[\s:|-]{3,}\|?\s*$/.test(l)) return "";
+    return l.replace(/^\s*#{1,6}\s+/,"").replace(/^\s*[-*+]\s+/,"").replace(/\*\*(.+?)\*\*/g,"$1");
+  }).join("\n").trim();
+}
 
 const SCALP = [["seborreica","Dermatite seborreica"],["foliculite","Foliculite"],["exantema","Exantema"]];
 
@@ -244,8 +251,7 @@ Laudo do cardiologista (resumo): ${cardio.trim()||"não enviado"}`;
   const gtxt={alta:"text-red-800",media:"text-amber-800",baixa:"text-emerald-800"};
   const gtag={alta:"Atenção alta",media:"Acompanhar",baixa:"Leve"};
   const clinSections=clin.split(/\n(?=# )/).map(s=>s.trim()).filter(Boolean).map(sec=>{const nl=sec.indexOf("\n");return {titulo:(nl<0?sec:sec.slice(0,nl)).replace(/^#\s+/,"").trim(),corpo:(nl<0?"":sec.slice(nl+1)).trim()};});
-  const evolucao=((partes[1])||"").trim();
-  const evolucaoCompleta=evolucao||clin;
+  const evolucao=limparMarkdown((partes[1])||"");
   const podeGerar=p.idade!==""&&p.peso!==""&&!loading;
 
   // Checklist de segurança — itens críticos antes da decisão
@@ -400,10 +406,10 @@ Laudo do cardiologista (resumo): ${cardio.trim()||"não enviado"}`;
             <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-700">Laudo — formato Feegow</span>
-                <button onClick={()=>copiar(evolucaoCompleta,"tudo")} className="rounded-md border border-teal-600 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">{copiado==="tudo"?"Copiado ✓":"Copiar evolução"}</button>
+                <button onClick={()=>copiar(evolucao,"tudo")} disabled={!evolucao} className="rounded-md border border-teal-600 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100 disabled:border-slate-300 disabled:text-slate-400">{copiado==="tudo"?"Copiado ✓":"Copiar evolução"}</button>
               </div>
               <div className="rounded-lg border border-slate-200 bg-white p-3">
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">{evolucao||evolucaoCompleta}</pre>
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">{evolucao||"Bloco Feegow não encontrado no laudo — não copie as seções de apoio acima no lugar dele."}</pre>
               </div>
               <button onClick={salvar} className="mt-4 w-full rounded-md border border-teal-600 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50">{salvo?"Salvo no histórico ✓":"Salvar no histórico"}</button>
             </div>
