@@ -89,43 +89,34 @@ gravidade|exame e valor|hipóteses (provável→grave)|motivo em 1 frase|conduta
 gravidade = alta|media|baixa. Sem alterado: nenhum|—|—|—|—)
 ===FIM===
 
-Agora a EVOLUÇÃO PARA O PRONTUÁRIO — é ISTO que o médico copia para a aba de consulta do Feegow. Regras de estilo: TELEGRÁFICA e ENXUTA (frases curtas, sem parágrafos explicativos, sem justificativas); use os valores informados; exame não informado é OMITIDO (não escreva "não informado" em exames — apenas nos campos ECG/couro cabeludo se ausentes); grupo inteiro sem exames é OMITIDO; NÃO repita aqui as seções de apoio, os riscos, os encaminhamentos nem o plano de contingência. TEXTO PURO: é PROIBIDO usar markdown (#, *, **, tabelas) nesta seção — apenas texto simples; a barra vertical (|) é só separador de campo dentro da linha do exame, não forma tabela. ORDEM FIXA dos blocos de exame, sem reordenar e sem numerar: Sorologias, Hemograma, Coagulograma, Endócrino, Hepático, Renal, Vitaminas e minerais, Marcadores. Escreva EXATAMENTE neste formato:
+Agora a EVOLUÇÃO PARA O PRONTUÁRIO — é ISTO que o médico copia para a aba de consulta do Feegow. Regras de estilo: TELEGRÁFICA e ENXUTA (frases curtas, sem parágrafos explicativos, sem justificativas); use os valores informados; exame não informado é OMITIDO (não escreva "não informado" em exames); grupo inteiro sem exames é OMITIDO; NÃO repita aqui as seções de apoio, os riscos, os encaminhamentos nem o plano de contingência. TEXTO PURO: é PROIBIDO usar markdown (#, *, **, tabelas) nesta seção — apenas texto simples; o ponto-e-vírgula (;) é só separador de campo dentro da linha do exame, não forma tabela. ORDEM FIXA e NUMERADA dos blocos de exame, sem reordenar: 1) Sorologias, 2) Hemograma, 3) Coagulograma, 4) Endócrino, 5) Hepático, 6) Renal, 7) Vitaminas, 8) Marcadores. Use as abreviações indicadas no molde (HM, Leuco, Plaq, GJ, BT/BD/BI etc.) — não escreva o nome completo do exame. Escreva EXATAMENTE neste formato:
 
 ---FEEGOW---
 AVALIAÇÃO PRÉ-OPERATÓRIA
 
-Data prevista da cirurgia: (informada ou "a confirmar")
-Tabagismo: (informado ou "nega")
-Medicamentos de uso contínuo: (lista, ou "nega")
-Etilismo: (informado ou "nega")
-Alergia prévia: (informada ou "nega")
-Comorbidades: (lista, ou "nega")
+-DATA PREVISTA DA CIRURGIA: (informada ou "a confirmar")
+-TABAGISMO: (informado ou "nega")
+-MEDICAMENTOS DE USO CONTÍNUO: (lista, ou "nega")
+-ETILISMO: (informado ou "nega")
+-ALERGIAS: (informada ou "nega")
+-COMORBIDADES: (lista, ou "nega")
 
-EXAMES
-Sorologias: Anti-HCV ... | HBsAg ... | Anti-HIV ... | VDRL ... | Anti-HBs ...
-Hemograma: Hemácias ... | Hb ... | Leucócitos ... | Plaquetas ...
-Coagulograma: RNI ... | PTTA ...
-Endócrino: HbA1c ... | Glicose jejum ... | TSH ... | T4 livre ... | Anti-TPO ... | Testosterona total ... | Testosterona livre ... | PTH ...
-Hepático: TGO ... | TGP ... | FA ... | GGT ... | Bilirrubina total ... | direta ... | indireta ...
-Renal: Creatinina ... | Ureia ... | TFG (CKD-EPI 2021) ... | Potássio ...
-Vitaminas e minerais: Vitamina D ... | B12 ... | Zinco ...
-Marcadores: Ferritina ... | DHT ...
+1) SOROLOGIAS: Anti-HCV ... ; HBsAg ... ; Anti-HIV ... ; VDRL ... ; Anti-HBs ...
+2) HEMOGRAMA: HM ... ; Hb ... ; Leuco ... ; Plaq ...
+3) COAGULOGRAMA: RNI ... ; PTTA ...
+4) ENDÓCRINO: HbA1c ... ; GJ ... ; TSH ... ; T4 livre ... ; Anti-TPO ... ; Testosterona total ... ; Testosterona livre ... ; PTH ...
+5) HEPÁTICO: TGO ... ; TGP ... ; FA ... ; GGT ... ; BT ... ; BD ... ; BI ...
+6) RENAL: Creatinina ... ; Ureia ...
+7) VITAMINAS: Vitamina D ... ; B12 ... ; Zinco ...
+8) MARCADORES: Ferritina ... ; DHT ...
 
-Risco Cirúrgico
-ECG: (use o laudo de ECG informado; se ausente, "não informado")
-Risco cirúrgico: ASA (estime pelas comorbidades; marque "estimado — confirmar com laudo cardiológico quando exigido")
-Observação de sedação: (SE o ECG indicar bloqueio de ramo direito ou outro distúrbio de condução, escreva "evitar dexmedetomidina (Precedex)"; caso contrário, OMITA esta linha inteira.)
+--- RISCO CIRURGICO: (ASA estimado pelas comorbidades; se pendente de laudo cardiológico, deixe em branco após os dois-pontos)
+--- ECG: (achado principal, compacto; se o ECG indicar bloqueio de ramo/outro distúrbio de condução, acrescente " — evitar dexmedetomidina (Precedex)" ao final desta mesma linha; se não realizado, deixe em branco)
+--- COURO CABELUDO: (achado e conduta em poucas palavras; se pendente de avaliação presencial, deixe em branco)
 
-EF
-Couro cabeludo: (achado e aptidão)
-
-Conduta
 CD:
-Suspensão de medicações: (só o que se aplica a ESTE paciente, realista para a janela; se nada, "sem suspensões necessárias")
-Orientações pré-op: jejum 8h (líquidos claros até 2h); sem álcool 48h; acompanhante adulto; não dirigir após. (+ o que for específico do caso, em poucas palavras)
-Orientações pós-op: cabeça elevada; não traumatizar enxertos; sem sol/esforço/álcool/fumo nos primeiros dias; lavagem e medicação conforme orientação; retorno agendado.
-Paciente orientado, nega dúvidas.
-DECISÃO FINAL: 🟢 LIBERADO PARA CIRURGIA. (ou 🟡 INVESTIGAR ANTES DE LIBERAR / 🔴 NÃO LIBERADO — o selo (🟢/🟡/🔴) deve espelhar EXATAMENTE a mesma decisão da primeira linha da resposta, sem novo julgamento.)`;
+Suspensao de medicações - (compacto, só o que se aplica a ESTE paciente: fármaco → ação → prazo; acrescente "(confirmar fonte)" ou "(ESCALAR AO PRESCRITOR)" entre parênteses quando aplicável; se nada, "NAO SE APLICA")
+(UMA frase corrida): orientações gerais + orientações pré-op pertinentes (jejum 8h, álcool, fumo, vestimenta) + o que for específico deste caso (ex.: tratamento de couro cabeludo, receitas pós-op). Termine com "Paciente orientado, nega dúvidas."`;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido" });
