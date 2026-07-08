@@ -72,9 +72,8 @@ const COURO_PROMPT = `Você é dermatologista analisando a FOTO do couro cabelud
 Responda em português, no máximo ~10 linhas, nesta estrutura:
 Morfologia: (o que se vê — mácula/pápula/placa/pústula, cor, descamação, distribuição, sinais de cicatriz/perda de óstios)
 Hipóteses: (da mais provável às alternativas, incluindo o que não pode ser descartado)
-Tratamento padrão-ouro da hipótese principal: (nome, concentração, forma de uso, posologia, tempo de uso)
-Reavaliação: (prazo sugerido para reavaliar)
-Aptidão sugerida: APTO | TRATAR E LIBERAR | REAVALIAR ANTES DE OPERAR | ENCAMINHAR AO DERMATOLOGISTA — com 1 frase de justificativa (considere: seborreica leve e foliculite esparsa não contraindicam; foliculite pustulosa difusa, exantema extenso/indefinido, tinea e psoríase ativa pedem reavaliar; suspeita de alopecia areata ativa, alopecia cicatricial (perda de óstios) ou lesão tumoral pedem encaminhar/negar)
+Aptidão sugerida: APTO | REAVALIAR ANTES DE OPERAR | ENCAMINHAR AO DERMATOLOGISTA — com 1 frase de justificativa (considere: seborreica leve e foliculite esparsa não contraindicam; foliculite pustulosa difusa, exantema extenso/indefinido, tinea e psoríase ativa pedem reavaliar; suspeita de alopecia areata ativa, alopecia cicatricial (perda de óstios) ou lesão tumoral pedem encaminhar/negar)
+NÃO proponha tratamento, produto, concentração ou posologia — apenas descreva o achado. Quem decide a conduta é o médico.
 Se a foto não permitir análise confiável (desfocada, distante, iluminação ruim), diga isso claramente e não invente achados.`;
 
 function extrairJSON(txt) {
