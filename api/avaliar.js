@@ -43,7 +43,7 @@ RECONCILIAÇÃO COM A JANELA CURTA: quando o tempo CABE nos 2-7 dias (metformina
 
 SEDAÇÃO (cautelas): dexmedetomidina → bradicardia/hipotensão (bloqueio AV, bradiarritmia, hipovolemia, disfunção de VE); propofol → hipotensão/apneia, sem analgesia (reduzir em idoso/hipovolemia); fentanil → depressão respiratória, sinergia de apneia com propofol (AOS/obesidade/DPOC); cetamina → preserva via aérea e broncodilata, mas eleva PA/FC (HAS não controlada, coronariopatia), sialorreia.
 
-COURO CABELUDO: para o achado informado (dermatite seborreica, foliculite, exantema, outro), proponha tratamento com NOME, DOSE/concentração, POSOLOGIA, TEMPO e RETORNO. Primeira linha atual (confirme na fonte se houver busca). Sem alteração → "Sem alteração relatada".
+COURO CABELUDO: descreva APENAS o achado informado (dermatite seborreica, foliculite, exantema, outro — relatado e/ou observado na foto enviada). NÃO proponha tratamento, produto, posologia ou retorno aqui — isso é decisão do médico. Sem alteração → "Sem alteração relatada".
 
 PAINEL PADRÃO (para FALTANTES): Hemácias, Hb, Leucócitos, Plaquetas, RNI, PTTA, Glicose jejum, HbA1c, TGO, TGP, FA, GGT, Bilirrubinas, Creatinina, Ureia, TFG, Potássio, TSH, T4L, Anti-TPO, PTH, Testosterona total/livre, DHT, B12, Vit D, Ferritina, Zinco, Anti-HBs, HBsAg, Anti-HIV, Anti-HCV, VDRL.
 Se houver busca disponível, confirme cutoffs/tempos de suspensão na fonte e cite o ano; sem busca, marque "[confirmar na fonte]".
@@ -74,7 +74,7 @@ Depois, as SEÇÕES DE APOIO abaixo. ELAS APARECEM NA TELA E NÃO SÃO COPIADAS 
 # Plano para evitar adiamento
 (para CADA achado perigoso/gatilho presente, o caminho MENOS disruptivo antes de cancelar: repetir o exame com o PREPARO correto (descreva o preparo), otimizar/suspender o que contribui, e — se necessário — encaminhar com RETORNO PRIORITÁRIO antes da data. Objetivo: não adiar sem necessidade. Nenhum achado perigoso → "Nenhum achado que exija plano de contingência.")
 
-# Couro cabeludo — conduta
+# Couro cabeludo — achados
 (conforme acima; ou "Sem alteração relatada".)
 
 # Sedação — protocolo (dexmedetomidina, propofol, fentanil, cetamina)
@@ -89,7 +89,7 @@ gravidade|exame e valor|hipóteses (provável→grave)|motivo em 1 frase|conduta
 gravidade = alta|media|baixa. Sem alterado: nenhum|—|—|—|—)
 ===FIM===
 
-Agora a EVOLUÇÃO PARA O PRONTUÁRIO — é ISTO que o médico copia para a aba de consulta do Feegow. Regras de estilo: TELEGRÁFICA e ENXUTA (frases curtas, sem parágrafos explicativos, sem justificativas); use os valores informados; exame não informado é OMITIDO (não escreva "não informado" em exames); grupo inteiro sem exames é OMITIDO; NÃO repita aqui as seções de apoio, os riscos, os encaminhamentos nem o plano de contingência. TEXTO PURO: é PROIBIDO usar markdown (#, *, **, tabelas) nesta seção — apenas texto simples; o ponto-e-vírgula (;) é só separador de campo dentro da linha do exame, não forma tabela. ORDEM FIXA e NUMERADA dos blocos de exame, sem reordenar: 1) Sorologias, 2) Hemograma, 3) Coagulograma, 4) Endócrino, 5) Hepático, 6) Renal, 7) Vitaminas, 8) Marcadores. Use as abreviações indicadas no molde (HM, Leuco, Plaq, GJ, BT/BD/BI etc.) — não escreva o nome completo do exame. Escreva EXATAMENTE neste formato:
+Agora a EVOLUÇÃO PARA O PRONTUÁRIO — é ISTO que o médico copia para a aba de consulta do Feegow. Regras de estilo: TELEGRÁFICA e ENXUTA (frases curtas, sem parágrafos explicativos, sem justificativas); use os valores informados; exame não informado é OMITIDO (não escreva "não informado" em exames); grupo inteiro sem exames é OMITIDO; NÃO repita aqui as seções de apoio, os riscos, os encaminhamentos nem o plano de contingência. TEXTO PURO: é PROIBIDO usar markdown (#, *, **, tabelas) nesta seção — apenas texto simples; o ponto-e-vírgula (;) é só separador de campo dentro da linha do exame, não forma tabela. ORDEM FIXA e NUMERADA dos blocos de exame, sem reordenar: 1) Sorologias, 2) Hemograma, 3) Coagulograma, 4) Endócrino, 5) Hepático, 6) Renal, 7) Vitaminas, 8) Marcadores. Use as abreviações indicadas no molde (HM, Leuco, Plaq, GJ, BT/BD/BI etc.) — não escreva o nome completo do exame. NUNCA inclua unidade de medida junto do valor (escreva "1,0", nunca "1,0 mg/dL"). NUNCA acrescente comentário, interpretação ou valor de referência após o resultado — só o valor cru. Escreva EXATAMENTE neste formato:
 
 ---FEEGOW---
 AVALIAÇÃO PRÉ-OPERATÓRIA
@@ -110,13 +110,15 @@ AVALIAÇÃO PRÉ-OPERATÓRIA
 7) VITAMINAS: Vitamina D ... ; B12 ... ; Zinco ...
 8) MARCADORES: Ferritina ... ; DHT ...
 
---- RISCO CIRURGICO: (ASA estimado pelas comorbidades; se pendente de laudo cardiológico, deixe em branco após os dois-pontos)
---- ECG: (achado principal, compacto; se o ECG indicar bloqueio de ramo/outro distúrbio de condução, acrescente " — evitar dexmedetomidina (Precedex)" ao final desta mesma linha; se não realizado, deixe em branco)
---- COURO CABELUDO: (achado e conduta em poucas palavras; se pendente de avaliação presencial, deixe em branco)
+--- RISCO CIRURGICO: SE houver ECG informado, estime o ASA pelas comorbidades; SE NÃO houver ECG informado, NÃO estime — escreva apenas "pendente".
+--- ECG: SE houver ECG informado, o achado principal em poucas palavras (se indicar bloqueio de ramo/outro distúrbio de condução, acrescente " — evitar dexmedetomidina (Precedex)" ao final desta mesma linha); SE NÃO houver ECG informado, escreva apenas "pendente".
+--- COURO CABELUDO: descreva APENAS o achado (relatado e/ou por foto enviada), sem propor tratamento; se ainda não avaliado, escreva "pendente".
 
 CD:
-Suspensao de medicações - (compacto, só o que se aplica a ESTE paciente: fármaco → ação → prazo; acrescente "(confirmar fonte)" ou "(ESCALAR AO PRESCRITOR)" entre parênteses quando aplicável; se nada, "NAO SE APLICA")
-(UMA frase corrida): orientações gerais + orientações pré-op pertinentes (jejum 8h, álcool, fumo, vestimenta) + o que for específico deste caso (ex.: tratamento de couro cabeludo, receitas pós-op). Termine com "Paciente orientado, nega dúvidas."`;
+Suspensao de medicações - (compacto: só fármacos que precisam de AÇÃO nesta janela — suspender/ajustar —, no formato fármaco → ação → prazo; NÃO mencione medicações mantidas; NÃO explique motivo nem risco; se nada precisa de ação, "NAO SE APLICA")
+(UMA frase corrida, seguindo ESTRITAMENTE as regras padrão de pós-operatório de transplante capilar): orientações gerais + orientações pré-op pertinentes (jejum 8h, álcool, fumo, vestimenta) + orientações pós-op padrão (cabeça elevada; não traumatizar os enxertos; sem sol/esforço/álcool/fumo nos primeiros dias; retorno agendado). NUNCA oriente aplicar ou usar qualquer produto/tratamento no couro cabeludo no pós-operatório. Termine com "Paciente orientado, nega dúvidas."
+
+RESULTADO: espelhe a DECISÃO do topo desta resposta, sem selo/emoji. Se for CIRURGIA LIBERADA e nenhuma das três linhas acima (RISCO CIRURGICO/ECG/COURO CABELUDO) estiver "pendente", escreva "CIRURGIA LIBERADA". Se houver qualquer pendência acima OU a decisão for INVESTIGAR ALTERAÇÃO APRESENTADA, escreva "PENDENTE: " seguido da lista do que falta ou precisa resolver, separada por vírgula. Se a decisão for CIRURGIA NEGADA, escreva "CIRURGIA NÃO LIBERADA — " seguido do motivo em poucas palavras.`;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido" });
