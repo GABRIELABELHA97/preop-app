@@ -89,7 +89,13 @@ gravidade|exame e valor|hipóteses (provável→grave)|motivo em 1 frase|conduta
 gravidade = alta|media|baixa. Sem alterado: nenhum|—|—|—|—)
 ===FIM===
 
-Agora a EVOLUÇÃO PARA O PRONTUÁRIO — é ISTO que o médico copia para a aba de consulta do Feegow. Regras de estilo: TELEGRÁFICA e ENXUTA (frases curtas, sem parágrafos explicativos, sem justificativas); use os valores informados; exame não informado é OMITIDO (não escreva "não informado" em exames); grupo inteiro sem exames é OMITIDO; NÃO repita aqui as seções de apoio, os riscos, os encaminhamentos nem o plano de contingência. TEXTO PURO: é PROIBIDO usar markdown (#, *, **, tabelas) nesta seção — apenas texto simples; o ponto-e-vírgula (;) é só separador de campo dentro da linha do exame, não forma tabela. ORDEM FIXA e NUMERADA dos blocos de exame, sem reordenar: 1) Sorologias, 2) Hemograma, 3) Coagulograma, 4) Endócrino, 5) Hepático, 6) Renal, 7) Vitaminas, 8) Marcadores. Use as abreviações indicadas no molde (HM, Leuco, Plaq, GJ, BT/BD/BI etc.) — não escreva o nome completo do exame. NUNCA inclua unidade de medida junto do valor (escreva "1,0", nunca "1,0 mg/dL"). NUNCA acrescente comentário, interpretação ou valor de referência após o resultado — só o valor cru. Escreva EXATAMENTE neste formato:
+Agora a EVOLUÇÃO PARA O PRONTUÁRIO — é ISTO que o médico copia para a aba de consulta do Feegow. Regras de estilo: TELEGRÁFICA e ENXUTA (frases curtas, sem parágrafos explicativos, sem justificativas); use os valores informados; exame não informado é OMITIDO (não escreva "não informado" em exames); grupo inteiro sem exames é OMITIDO; NÃO repita aqui as seções de apoio, os riscos, os encaminhamentos nem o plano de contingência. TEXTO PURO: é PROIBIDO usar markdown (#, *, **, tabelas) nesta seção — apenas texto simples; o ponto-e-vírgula (;) é só separador de campo dentro da linha do exame, não forma tabela. ORDEM FIXA e NUMERADA dos blocos de exame, sem reordenar: 1) Sorologias, 2) Hemograma, 3) Coagulograma, 4) Endócrino, 5) Hepático, 6) Renal, 7) Vitaminas, 8) Marcadores. Use as abreviações indicadas no molde (HM, Leuco, Plaq, GJ, BT/BD/BI etc.) — não escreva o nome completo do exame. NUNCA inclua unidade de medida junto do valor (escreva "1,0", nunca "1,0 mg/dL"). NUNCA acrescente comentário, interpretação ou valor de referência após o resultado — só o valor cru. REFORÇO — VALOR CRU, SEM REFERÊNCIA: esta é a regra mais violada, preste atenção redobrada. Cada exame no bloco Feegow é "nome valor" e PONTO FINAL — nada depois do valor. É PROIBIDO escrever a faixa normal, "(VR: ...)", "ref:", "normal", "alterado", unidade, ou qualquer comentário colado ao resultado, mesmo que os dados de entrada tragam essa referência junto do exame. Errado: "Leuco 6800 (4000-10000)" ou "Creatinina 1,1 (normal)". Certo: "Leuco 6800" e "Creatinina 1,1". Se o dado de entrada vier com faixa de referência junto, IGNORE a faixa e copie só o valor do paciente.
+
+REFORÇO — HEMOGRAMA SÓ 4 CAMPOS: o bloco 2) HEMOGRAMA leva EXATAMENTE HM, Hb, Leuco, Plaq — nada além disso. NUNCA inclua diferencial leucocitário (segmentados, bastonetes, linfócitos, monócitos, eosinófilos, basófilos), VCM, HCM, CHCM, RDW ou qualquer outro índice, mesmo que constem nos dados de entrada. Se o exame de entrada trouxer o hemograma completo, extraia apenas os 4 valores pedidos e descarte o resto.
+
+REFORÇO — ASA/RISCO EXIGE ECG, SEM EXCEÇÃO: é PROIBIDO estimar ASA ou qualquer classificação de risco cirúrgico a partir de idade/comorbidades quando não há ECG informado nos dados de entrada — mesmo que o caso pareça simples ou óbvio. Sem ECG explicitamente presente nos dados, a linha RISCO CIRURGICO é sempre e apenas "pendente", sem número de ASA, sem justificativa, sem estimativa provisória.
+
+Escreva EXATAMENTE neste formato:
 
 ---FEEGOW---
 AVALIAÇÃO PRÉ-OPERATÓRIA
@@ -110,7 +116,7 @@ AVALIAÇÃO PRÉ-OPERATÓRIA
 7) VITAMINAS: Vitamina D ... ; B12 ... ; Zinco ...
 8) MARCADORES: Ferritina ... ; DHT ...
 
---- RISCO CIRURGICO: SE houver ECG informado, estime o ASA pelas comorbidades; SE NÃO houver ECG informado, NÃO estime — escreva apenas "pendente".
+--- RISCO CIRURGICO: SE houver ECG informado, estime o ASA pelas comorbidades; SE NÃO houver ECG informado, NÃO estime SOB NENHUMA HIPÓTESE — escreva apenas "pendente" (nunca um número de ASA, nunca "provável", nunca estimativa "preliminar").
 --- ECG: SE houver ECG informado, o achado principal em poucas palavras (se indicar bloqueio de ramo/outro distúrbio de condução, acrescente " — evitar dexmedetomidina (Precedex)" ao final desta mesma linha); SE NÃO houver ECG informado, escreva apenas "pendente".
 --- COURO CABELUDO: descreva APENAS o achado (relatado e/ou por foto enviada), sem propor tratamento; se ainda não avaliado, escreva "pendente".
 

@@ -56,6 +56,30 @@ function limparMarkdown(txt){
     return l.replace(/^\s*#{1,6}\s+/,"").replace(/^\s*[-*+]\s+/,"").replace(/\*\*(.+?)\*\*/g,"$1");
   }).join("\n").trim();
 }
+// reforço defensivo #2: mesmo com a regra no prompt, a IA às vezes cola valor de referência/unidade
+// no resultado, inclui diferencial de leucócitos além do molde, ou estima ASA sem ECG informado.
+// Isso limpa esses vazamentos direto no texto que vai para o Feegow, sem depender só do prompt.
+function sanitizeFeegow(txt, temRiscoInfo){
+  const REF_PAREN = /\([^)]*\)/g;
+  const UNIDADES = /\s*(mg\/dl|ui\/l|ng\/ml|µ?ui\/ml|m?ui\/l|g\/dl|\/mm3|\/mm³|meq\/l|pg\/ml|mmol\/l|u\/l|mm\/h|copias?\/ml|%)(?=[\s;]|$)/gi;
+  const REF_PALAVRA = /\b(vr|v\.r\.|ref(?:er[êe]ncia)?)\s*:?\s*[\d.,\-a-z\s]*(?=;|$)/gi;
+  const NORMAL_ALTERADO = /\s*[-–]?\s*\b(normal|alterado)\b/gi;
+  const DIFERENCIAL_LEUCO = /\b(segmentados?|bastonetes?|bast[õo]es|linf[óo]citos?|mon[óo]citos?|eosin[óo]filos?|bas[óo]filos?|met[ae]?mielocitos?|mielocitos?|vcm|hcm|chcm|rdw|hematoc?rito)\b\s*:?\s*[^;\n]*/gi;
+
+  return String(txt||"").split("\n").map(line=>{
+    const trimmed=line.trim();
+    const isExamLine=/^\d\)\s/.test(trimmed);
+    let l=line;
+    if(isExamLine){
+      l=l.replace(REF_PAREN,"").replace(UNIDADES,"").replace(REF_PALAVRA,"").replace(NORMAL_ALTERADO,"").replace(DIFERENCIAL_LEUCO,"");
+      l=l.replace(/;(\s*;)+/g,";").replace(/;\s*$/,"").replace(/:\s*;/,":").replace(/[ \t]{2,}/g," ").trimEnd();
+    }
+    if(/^---\s*RISCO CIRURGICO\s*:/i.test(trimmed) && !temRiscoInfo){
+      l="--- RISCO CIRURGICO: pendente";
+    }
+    return l;
+  }).join("\n").trim();
+}
 
 const SCALP = [["seborreica","Dermatite seborreica"],["foliculite","Foliculite"],["exantema","Exantema"]];
 
@@ -272,7 +296,7 @@ Laudo do cardiologista (resumo): ${cardio.trim()||"não enviado"}`;
   const gtxt={alta:"text-red-800",media:"text-amber-800",baixa:"text-emerald-800"};
   const gtag={alta:"Atenção alta",media:"Acompanhar",baixa:"Leve"};
   const clinSections=clin.split(/\n(?=# )/).map(s=>s.trim()).filter(Boolean).map(sec=>{const nl=sec.indexOf("\n");return {titulo:(nl<0?sec:sec.slice(0,nl)).replace(/^#\s+/,"").trim(),corpo:(nl<0?"":sec.slice(nl+1)).trim()};});
-  const evolucao=limparMarkdown((partes[1])||"");
+  const evolucao=sanitizeFeegow(limparMarkdown((partes[1])||""), !!(ecg.trim()||cardio.trim()));
   const podeGerar=p.idade!==""&&p.peso!==""&&!loading;
 
   // Checklist de segurança — itens críticos antes da decisão
@@ -449,21 +473,34 @@ Laudo do cardiologista (resumo): ${cardio.trim()||"não enviado"}`;
 }
 
 function Historico() {
-  const [casos,setCasos]=useState(null); const [aberto,setAberto]=useState(null);
+  const [casos,setCasos]=useState(null); const [aberto,setAberto]=useState(null); const [copiado,setCopiado]=useState(null);
   useEffect(()=>{ sb.from("casos").select("*").order("created_at",{ascending:false}).then(({data})=>setCasos(data||[])); },[]);
+  function copiar(txt,id){ try{ navigator.clipboard.writeText(txt).then(()=>{setCopiado(id);setTimeout(()=>setCopiado(null),1500);}); }catch(e){} }
   if(casos===null) return <p className="text-sm text-slate-500">Carregando…</p>;
   if(casos.length===0) return <p className="text-sm text-slate-500">Nenhum caso salvo ainda.</p>;
   return (
     <div className="space-y-3">
-      {casos.map(c=>(
+      {casos.map(c=>{
+        const evolucao=sanitizeFeegow(limparMarkdown((String(c.laudo||"").split(/---\s*FEEGOW\s*---/i)[1])||""), true);
+        return (
         <div key={c.id} className="rounded-lg border border-slate-200 bg-white p-4">
           <button onClick={()=>setAberto(aberto===c.id?null:c.id)} className="flex w-full items-center justify-between text-left">
             <span className="font-medium text-slate-800">{c.codigo} <span className="text-xs font-normal text-slate-400">· {c.idade||"?"}a · {new Date(c.created_at).toLocaleDateString("pt-BR")}</span></span>
             <span className="text-xs text-teal-700">{aberto===c.id?"fechar":"ver"}</span>
           </button>
-          {aberto===c.id&&<div className="mt-3 whitespace-pre-wrap border-t border-slate-100 pt-3 text-sm text-slate-700">{c.laudo||"(sem laudo)"}</div>}
+          {aberto===c.id&&(
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-700">Laudo — formato Feegow</span>
+                <button onClick={()=>copiar(evolucao||c.laudo||"",c.id)} disabled={!evolucao&&!c.laudo} className="rounded-md border border-teal-600 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100 disabled:border-slate-300 disabled:text-slate-400">{copiado===c.id?"Copiado ✓":"Copiar"}</button>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">{evolucao||c.laudo||"(sem laudo)"}</pre>
+              </div>
+            </div>
+          )}
         </div>
-      ))}
+      );})}
     </div>
   );
 }
@@ -516,6 +553,59 @@ function SuspensaoFarmaco({ session }){
   );
 }
 
+function Antecedentes({ session }){
+  const [eventos,setEventos]=useState("");
+  const [quadroAtual,setQuadroAtual]=useState("");
+  const [usarBusca,setUsarBusca]=useState(true);
+  const [busy,setBusy]=useState(false); const [erro,setErro]=useState(""); const [resultado,setResultado]=useState(""); const [copiado,setCopiado]=useState(false);
+
+  async function analisar(){
+    if(!eventos.trim()) return;
+    setBusy(true); setErro(""); setResultado(""); setCopiado(false);
+    try{
+      const { data:{ session:s } }=await sb.auth.getSession();
+      const r=await fetch("/api/antecedentes",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${s.access_token}`},body:JSON.stringify({eventos,quadroAtual,usarBusca})});
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error||"Falha ao analisar");
+      setResultado(j.resultado);
+    }catch(e){ setErro(e.message); }
+    finally{ setBusy(false); }
+  }
+
+  function copiar(){ try{ navigator.clipboard.writeText(resultado).then(()=>{setCopiado(true);setTimeout(()=>setCopiado(false),1500);}); }catch(e){} }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-4">
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div>
+          <label className="block text-sm text-slate-600 mb-1">História patológica pregressa <span className="text-xs text-slate-400">(eventos passados: infarto, AVC, cirurgias, internações, TEV etc.)</span></label>
+          <textarea className={input+" min-h-[110px] font-mono text-xs"} value={eventos} onChange={e=>setEventos(e.target.value)} placeholder={"ex.:\nIAM em 2019, stent farmacológico em coronária direita\nAVC isquêmico em 2021, sem sequela motora\nColecistectomia videolaparoscópica em 2015, sem intercorrência anestésica"} />
+        </div>
+        <div>
+          <label className="block text-sm text-slate-600 mb-1">Quadro atual <span className="text-xs text-slate-400">(idade, comorbidades, medicações em uso, procedimento previsto — opcional, mas melhora a correlação)</span></label>
+          <textarea className={input+" min-h-[90px] font-mono text-xs"} value={quadroAtual} onChange={e=>setQuadroAtual(e.target.value)} placeholder={"ex.:\n58 anos, HAS controlada, AAS 100mg/dia\nTransplante capilar FUE marcado para 20/07/2026"} />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={usarBusca} onChange={e=>setUsarBusca(e.target.checked)} className="h-4 w-4 accent-teal-700" /> Confirmar diretrizes na fonte</label>
+        <button onClick={analisar} disabled={busy||!eventos.trim()} className="w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300">{busy?"Analisando…":"Correlacionar com o quadro atual"}</button>
+        {erro&&<p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{erro}</p>}
+      </div>
+
+      {resultado&&(
+        <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-700">Correlação com antecedentes</span>
+            <button onClick={copiar} className="rounded-md border border-teal-600 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">{copiado?"Copiado ✓":"Copiar"}</button>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">{resultado}</pre>
+          </div>
+          <p className="mt-3 px-1 text-[11px] leading-snug text-slate-400">Apoio à decisão gerado por IA. Confirme os achados e decida a conduta sob sua responsabilidade.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App(){
   const [session,setSession]=useState(undefined); const [tab,setTab]=useState("nova");
   useEffect(()=>{ sb.auth.getSession().then(({data})=>setSession(data.session)); const { data:sub }=sb.auth.onAuthStateChange((_e,s)=>setSession(s)); return ()=>sub.subscription.unsubscribe(); },[]);
@@ -532,9 +622,10 @@ function App(){
         <div className="mb-5 flex gap-2">
           <button onClick={()=>setTab("nova")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="nova"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Nova avaliação</button>
           <button onClick={()=>setTab("farmaco")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="farmaco"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Suspensão de fármacos</button>
+          <button onClick={()=>setTab("antecedentes")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="antecedentes"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Antecedentes patológicos</button>
           <button onClick={()=>setTab("hist")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="hist"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Histórico</button>
         </div>
-        {tab==="nova"?<Avaliacao session={session} />:tab==="farmaco"?<SuspensaoFarmaco session={session} />:<Historico />}
+        {tab==="nova"?<Avaliacao session={session} />:tab==="farmaco"?<SuspensaoFarmaco session={session} />:tab==="antecedentes"?<Antecedentes session={session} />:<Historico />}
       </div>
     </div>
   );
