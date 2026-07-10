@@ -109,7 +109,7 @@ function Auth() {
 }
 
 function Avaliacao({ session }) {
-  const [p,setP]=useState({codigo:"",idade:"",sexo:"M",altura:"",peso:"",dataCirurgia:"",tabagismo:"",etilismo:"",alergia:"",medicacoes:"",exAlt:"",exLivre:"",funcional:"desconhecido",scalpObs:""});
+  const [p,setP]=useState({codigo:"",idade:"",sexo:"M",altura:"",peso:"",dataCirurgia:"",tabagismo:"",etilismo:"",alergia:"",medicacoes:"",exAlt:"",exLivre:"",funcional:"desconhecido",scalpObs:"",historiaPregressa:""});
   const [scalp,setScalp]=useState({});
   const [ex,setEx]=useState({});
   const [comorb,setComorb]=useState({}); const [usarBusca,setUsarBusca]=useState(true);
@@ -247,6 +247,7 @@ Tabagismo: ${p.tabagismo.trim()||"nega"}
 Etilismo: ${p.etilismo.trim()||"nega"}
 Alergia prévia: ${p.alergia.trim()||"nega"}
 Comorbidades: ${co.join(", ")||"nenhuma referida"}
+História patológica pregressa (eventos passados — correlacionar com o quadro atual): ${p.historiaPregressa.trim()||"nega eventos relevantes"}
 Capacidade funcional: ${fmap[p.funcional]}
 Medicações:
 ${p.medicacoes.trim()||"(não informadas)"}
@@ -337,6 +338,7 @@ Laudo do cardiologista (resumo): ${cardio.trim()||"não enviado"}`;
             <p className="text-sm text-slate-600 mb-2">Comorbidades</p>
             <div className="flex flex-wrap gap-2">{COMORB.map(([k,l])=><button key={k} onClick={()=>setComorb(s=>({...s,[k]:!s[k]}))} className={"rounded-full border px-3 py-1.5 text-sm "+(comorb[k]?"border-teal-600 bg-teal-50 text-teal-800":"border-slate-300 text-slate-600")}>{l}</button>)}</div>
           </div>
+          <div><label className="block text-sm text-slate-600 mb-1">História patológica pregressa <span className="text-xs text-slate-400">(eventos passados: infarto, AVC, cirurgias, internações, complicação anestésica prévia etc. — entra na avaliação e é correlacionada com o quadro atual)</span></label><textarea className={input+" min-h-[70px] text-xs"} value={p.historiaPregressa} onChange={e=>set("historiaPregressa",e.target.value)} placeholder="ex.: IAM em 2019 com stent farmacológico; colecistectomia videolaparoscópica em 2015 sem intercorrência anestésica" /></div>
           <div><label className="block text-sm text-slate-600 mb-1">Medicações (uma por linha)</label><textarea className={input+" min-h-[80px] font-mono text-xs"} value={p.medicacoes} onChange={e=>set("medicacoes",e.target.value)} /></div>
           <div><label className="block text-sm text-slate-600 mb-1">Capacidade funcional</label><select className={input} value={p.funcional} onChange={e=>set("funcional",e.target.value)}><option value="ge4">≥4 METs — sobe escada sem sintoma</option><option value="lt4">&lt;4 METs — dispneia leve</option><option value="desconhecido">Não avaliada</option></select></div>
           <div>
@@ -553,59 +555,6 @@ function SuspensaoFarmaco({ session }){
   );
 }
 
-function Antecedentes({ session }){
-  const [eventos,setEventos]=useState("");
-  const [quadroAtual,setQuadroAtual]=useState("");
-  const [usarBusca,setUsarBusca]=useState(true);
-  const [busy,setBusy]=useState(false); const [erro,setErro]=useState(""); const [resultado,setResultado]=useState(""); const [copiado,setCopiado]=useState(false);
-
-  async function analisar(){
-    if(!eventos.trim()) return;
-    setBusy(true); setErro(""); setResultado(""); setCopiado(false);
-    try{
-      const { data:{ session:s } }=await sb.auth.getSession();
-      const r=await fetch("/api/antecedentes",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${s.access_token}`},body:JSON.stringify({eventos,quadroAtual,usarBusca})});
-      const j=await r.json();
-      if(!r.ok) throw new Error(j.error||"Falha ao analisar");
-      setResultado(j.resultado);
-    }catch(e){ setErro(e.message); }
-    finally{ setBusy(false); }
-  }
-
-  function copiar(){ try{ navigator.clipboard.writeText(resultado).then(()=>{setCopiado(true);setTimeout(()=>setCopiado(false),1500);}); }catch(e){} }
-
-  return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div>
-          <label className="block text-sm text-slate-600 mb-1">História patológica pregressa <span className="text-xs text-slate-400">(eventos passados: infarto, AVC, cirurgias, internações, TEV etc.)</span></label>
-          <textarea className={input+" min-h-[110px] font-mono text-xs"} value={eventos} onChange={e=>setEventos(e.target.value)} placeholder={"ex.:\nIAM em 2019, stent farmacológico em coronária direita\nAVC isquêmico em 2021, sem sequela motora\nColecistectomia videolaparoscópica em 2015, sem intercorrência anestésica"} />
-        </div>
-        <div>
-          <label className="block text-sm text-slate-600 mb-1">Quadro atual <span className="text-xs text-slate-400">(idade, comorbidades, medicações em uso, procedimento previsto — opcional, mas melhora a correlação)</span></label>
-          <textarea className={input+" min-h-[90px] font-mono text-xs"} value={quadroAtual} onChange={e=>setQuadroAtual(e.target.value)} placeholder={"ex.:\n58 anos, HAS controlada, AAS 100mg/dia\nTransplante capilar FUE marcado para 20/07/2026"} />
-        </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={usarBusca} onChange={e=>setUsarBusca(e.target.checked)} className="h-4 w-4 accent-teal-700" /> Confirmar diretrizes na fonte</label>
-        <button onClick={analisar} disabled={busy||!eventos.trim()} className="w-full rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300">{busy?"Analisando…":"Correlacionar com o quadro atual"}</button>
-        {erro&&<p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{erro}</p>}
-      </div>
-
-      {resultado&&(
-        <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-700">Correlação com antecedentes</span>
-            <button onClick={copiar} className="rounded-md border border-teal-600 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">{copiado?"Copiado ✓":"Copiar"}</button>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">{resultado}</pre>
-          </div>
-          <p className="mt-3 px-1 text-[11px] leading-snug text-slate-400">Apoio à decisão gerado por IA. Confirme os achados e decida a conduta sob sua responsabilidade.</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function App(){
   const [session,setSession]=useState(undefined); const [tab,setTab]=useState("nova");
   useEffect(()=>{ sb.auth.getSession().then(({data})=>setSession(data.session)); const { data:sub }=sb.auth.onAuthStateChange((_e,s)=>setSession(s)); return ()=>sub.subscription.unsubscribe(); },[]);
@@ -622,10 +571,9 @@ function App(){
         <div className="mb-5 flex gap-2">
           <button onClick={()=>setTab("nova")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="nova"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Nova avaliação</button>
           <button onClick={()=>setTab("farmaco")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="farmaco"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Suspensão de fármacos</button>
-          <button onClick={()=>setTab("antecedentes")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="antecedentes"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Antecedentes patológicos</button>
           <button onClick={()=>setTab("hist")} className={"rounded-md px-3 py-1.5 text-sm "+(tab==="hist"?"bg-teal-700 text-white":"bg-white border border-slate-200 text-slate-600")}>Histórico</button>
         </div>
-        {tab==="nova"?<Avaliacao session={session} />:tab==="farmaco"?<SuspensaoFarmaco session={session} />:tab==="antecedentes"?<Antecedentes session={session} />:<Historico />}
+        {tab==="nova"?<Avaliacao session={session} />:tab==="farmaco"?<SuspensaoFarmaco session={session} />:<Historico />}
       </div>
     </div>
   );

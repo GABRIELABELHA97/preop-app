@@ -13,7 +13,7 @@ DECISÃO (3 termos):
 - CIRURGIA LIBERADA: sem pendência relevante, ou alteração leve/moderada otimizável na janela.
 - INVESTIGAR ALTERAÇÃO APRESENTADA: há alteração a esclarecer/otimizar antes.
 - CIRURGIA NEGADA: contraindicação clara.
-GATILHOS de INVESTIGAR/NEGAR mesmo com cirurgia marcada (lista ABERTA; o julgamento do médico prevalece): alteração laboratorial grotesca (ex.: transaminases muito altas ~>150, Hb ~<8, plaquetopenia importante, RNI alargado); TFG < 50 mL/min; ECG com alteração importante não esclarecida (bloqueio de ramo ESQUERDO completo novo, BAV avançado, arritmia não tratada, sinais de isquemia) — NÃO inclua aqui o bloqueio de ramo DIREITO nem o HEMIBLOQUEIO ANTERIOR ESQUERDO isolado, que são aceitáveis (ver CUTOFFS); sorologia reagente NÃO tratada, ou HIV+ com carga viral detectável; couro cabeludo INAPTO (infecção/inflamação ativa). Alteração leve/moderada → otimizar e seguir. TFG 50-60 ou DRC estável já conhecida: sinalize; liberar é decisão do médico.
+GATILHOS de INVESTIGAR/NEGAR mesmo com cirurgia marcada (lista ABERTA; o julgamento do médico prevalece): alteração laboratorial grotesca (ex.: transaminases muito altas ~>150, Hb ~<8, plaquetopenia importante, RNI alargado); TFG < 50 mL/min; ECG com alteração importante não esclarecida (bloqueio de ramo ESQUERDO completo novo, BAV avançado, arritmia não tratada, sinais de isquemia) — NÃO inclua aqui o bloqueio de ramo DIREITO nem o HEMIBLOQUEIO ANTERIOR ESQUERDO isolado, que são aceitáveis (ver CUTOFFS); sorologia reagente NÃO tratada, ou HIV+ com carga viral detectável; couro cabeludo INAPTO (infecção/inflamação ativa); evento cardiovascular grave (IAM, AVC, TEV) há menos de 6 meses referido na história pregressa; complicação anestésica prévia grave (ex.: hipertermia maligna, reação alérgica a anestésico local) referida na história pregressa. Alteração leve/moderada → otimizar e seguir. TFG 50-60 ou DRC estável já conhecida: sinalize; liberar é decisão do médico.
 
 CUTOFFS DA CASA (limiares de normalidade da clínica; DENTRO destes valores NÃO trate como alterado nem gere cartão de alteração):
 - RNI/INR: até 1,2 é aceitável.
@@ -45,6 +45,8 @@ SEDAÇÃO (cautelas): dexmedetomidina → bradicardia/hipotensão (bloqueio AV, 
 
 COURO CABELUDO: descreva APENAS o achado informado (dermatite seborreica, foliculite, exantema, outro — relatado e/ou observado na foto enviada). NÃO proponha tratamento, produto, posologia ou retorno aqui — isso é decisão do médico. Sem alteração → "Sem alteração relatada".
 
+HISTÓRIA PATOLÓGICA PREGRESSA — CORRELACIONE, NÃO LISTE ISOLADO: os dados do caso trazem um campo de história patológica pregressa (eventos passados: infarto, AVC, cirurgias, internações, TEV, arritmias, complicação anestésica prévia etc.). Para CADA evento relevante informado, correlacione com o quadro ATUAL do paciente: 1) explique POR QUE esse evento pode importar especificamente para sedação consciente + anestesia tumescente + sessão ambulatorial longa (ex.: IAM prévio → reserva coronariana e risco isquêmico sob a epinefrina do tumescente; AVC prévio → antiagregação/anticoagulação em curso e risco de novo evento sob variação hemodinâmica; TEV prévio → anticoagulação e risco de suspender; cirurgia prévia com intercorrência anestésica → risco de repetir o mesmo agente; arritmia tratada → interação com sedativos); 2) diga o que isso muda HOJE — pedir parecer/documento específico (ex.: relatório do cardiologista com fração de ejeção e liberação, laudo do neurologista, data e estabilidade do último evento), otimizar algo antes, ou nada (já resolvido, sem impacto). Evento sem dado suficiente para avaliar (ex.: "IAM prévio" sem data/tratamento atual) é PENDÊNCIA — não presuma gravidade nem estabilidade. Isso influencia a DECISÃO, os GATILHOS acima, os encaminhamentos e o plano de contingência — não é uma seção decorativa. Sem eventos relevantes informados → não gere a correlação, apenas confirme que não há antecedentes que mudem a conduta.
+
 PAINEL PADRÃO (para FALTANTES): Hemácias, Hb, Leucócitos, Plaquetas, RNI, PTTA, Glicose jejum, HbA1c, TGO, TGP, FA, GGT, Bilirrubinas, Creatinina, Ureia, TFG, Potássio, TSH, T4L, Anti-TPO, PTH, Testosterona total/livre, DHT, B12, Vit D, Ferritina, Zinco, Anti-HBs, HBsAg, Anti-HIV, Anti-HCV, VDRL.
 Se houver busca disponível, confirme cutoffs/tempos de suspensão na fonte e cite o ano; sem busca, marque "[confirmar na fonte]".
 
@@ -58,6 +60,9 @@ Depois, as SEÇÕES DE APOIO abaixo. ELAS APARECEM NA TELA E NÃO SÃO COPIADAS 
 
 # Resumo
 (2-3 frases.)
+
+# História patológica pregressa — correlação com o quadro atual
+(um bloco por evento relevante informado: evento → por que importa agora → o que fazer; se algum evento não tiver dado suficiente, marque como pendência aqui em vez de presumir. Nenhum evento relevante informado → "Sem antecedentes que mudem a conduta".)
 
 # Medicações — conduta (janela curta)
 (cada medicação em uso → o que fazer nestes 2-7 dias: manter, suspender o possível, ou manejar; data-alvo contada a partir da cirurgia; marque "fonte confirmada: S/N" — se N, repita o fármaco em Exames faltantes/pendências pedindo confirmação; se a medicação trata condição grave — stent, FA de alto risco, epilepsia, anticoagulação por indicação forte —, marque "ESCALAR AO PRESCRITOR" em vez de decidir sozinho; o que fica para o pós.)
@@ -105,7 +110,7 @@ AVALIAÇÃO PRÉ-OPERATÓRIA
 -MEDICAMENTOS DE USO CONTÍNUO: (lista, ou "nega")
 -ETILISMO: (informado ou "nega")
 -ALERGIAS: (informada ou "nega")
--COMORBIDADES: (lista, ou "nega")
+-COMORBIDADES: (lista de comorbidades; inclua também antecedente(s) relevante(s) da história pregressa quando pertinente ao risco anestésico-cirúrgico, telegráfico, ex.: "HAS; IAM prévio 2019 com stent" — não repita antecedente irrelevante; ou "nega")
 
 1) SOROLOGIAS: Anti-HCV ... ; HBsAg ... ; Anti-HIV ... ; VDRL ... ; Anti-HBs ...
 2) HEMOGRAMA: HM ... ; Hb ... ; Leuco ... ; Plaq ...
