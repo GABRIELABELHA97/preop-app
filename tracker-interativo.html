@@ -89,6 +89,18 @@
 		.summary-table th, .summary-table td { padding: 0.5rem; text-align: center; border-bottom: 1px solid var(--color-gray); }
 		.summary-table th { background: var(--color-dark); color: var(--color-white); font-weight: bold; }
 		.color-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+			.empty-state { text-align: center; padding: 4rem 2rem; }
+			.empty-state p { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--color-gray); }
+			.btn-import { background: var(--color-dark); color: var(--color-white); border: none; padding: 0.75rem 1.5rem; border-radius: 4px; font-size: 1rem; cursor: pointer; }
+			.btn-import:hover { opacity: 0.9; }
+
+			.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+			.modal-content { background: var(--color-white); padding: 2rem; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+			.modal-content h2 { margin-bottom: 0.5rem; }
+			.modal-content textarea { width: 100%; margin-top: 1rem; font-family: var(--font-mono); padding: 0.5rem; resize: vertical; }
+			.modal-actions { margin-top: 1rem; text-align: right; }
+			.btn-process { background: #3498db; color: var(--color-white); border: none; padding: 0.5rem 1.25rem; border-radius: 4px; cursor: pointer; margin-left: 0.5rem; }
+			.btn-cancel { background: var(--color-gray); color: var(--color-white); border: none; padding: 0.5rem 1.25rem; border-radius: 4px; cursor: pointer; }
 	</style>
 </head>
 <body>
@@ -576,6 +588,66 @@
 				},
 			};
 		})();
+
+		window.showImportModal = () => {
+			const overlay = document.createElement('div');
+			overlay.className = 'modal-overlay';
+			overlay.id = 'import-modal-overlay';
+			overlay.innerHTML = `
+				<div class="modal-content">
+					<h2>📥 Importar de Obsidian</h2>
+					<p>Cole o conteúdo de <code>Tabela Hora a Hora.md</code>:</p>
+					<textarea id="import-textarea" rows="15" placeholder="Cole aqui o conteúdo da tabela markdown..."></textarea>
+					<div class="modal-actions">
+						<button id="btn-cancel-import" class="btn-cancel">Cancelar</button>
+						<button id="btn-process-import" class="btn-process">Processar</button>
+					</div>
+				</div>
+			`;
+			document.body.appendChild(overlay);
+
+			const closeModal = () => overlay.remove();
+
+			document.getElementById('btn-cancel-import').addEventListener('click', closeModal);
+			overlay.addEventListener('click', (e) => {
+				if (e.target === overlay) closeModal();
+			});
+
+			document.getElementById('btn-process-import').addEventListener('click', () => {
+				const mdText = document.getElementById('import-textarea').value;
+				const themes = MDParser.parse(mdText);
+				themes.forEach(theme => DataModel.addTheme(theme));
+				closeModal();
+				location.reload();
+			});
+		};
+
+		const renderEmptyState = () => {
+			const app = document.getElementById('app');
+			app.innerHTML = `
+				<header><h1>📊 Tracker Interativo — Pós Psiquiatria</h1><p>27/07–26/08/2026 • ~80 temas</p></header>
+				<main>
+					<div class="empty-state">
+						<p>Nenhum tema carregado</p>
+						<button id="btn-import" class="btn-import">📥 Importar de Obsidian</button>
+					</div>
+				</main>
+				<footer>💾 localStorage • 📤 Export | 📥 Import</footer>
+			`;
+			document.getElementById('btn-import').addEventListener('click', showImportModal);
+		};
+
+		window.addEventListener('DOMContentLoaded', () => {
+			DataModel.init();
+
+			if (DataModel.getThemes().length === 0) {
+				renderEmptyState();
+			} else {
+				TimelineUI.render();
+				TableUI.render();
+				DailySummaryUI.render();
+			}
+		});
 	</script>
 </body>
 </html>
