@@ -451,8 +451,17 @@
 						<main>
 							<div class="timeline">${weeksHtml}</div>
 						</main>
-						<footer>💾 localStorage • 📤 Export | 📥 Import</footer>
+						<footer>💾 localStorage • 📤 Exportar | 📥 Importar • ✓ Sincronizado: ${new Date().toLocaleTimeString('pt-BR')}</footer>
 					`;
+
+					// Add export button to header
+					const header = document.querySelector('header');
+					const exportBtn = document.createElement('button');
+					exportBtn.id = 'btn-export-main';
+					exportBtn.textContent = '📤 Exportar';
+					exportBtn.style.cssText = 'padding: 0.5rem 1rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 1rem; font-size: 0.95rem;';
+					exportBtn.addEventListener('click', () => ExportManager.showExportModal());
+					header.appendChild(exportBtn);
 				},
 			};
 		})();
@@ -1007,11 +1016,29 @@
 					<div class="empty-state">
 						<p>Nenhum tema carregado</p>
 						<button id="btn-import" class="btn-import">📥 Importar de Obsidian</button>
+						<button id="btn-demo" class="btn-import" style="margin-left: 1rem; background: #95a5a6;">🔄 Carregar Demo</button>
 					</div>
 				</main>
-				<footer>💾 localStorage • 📤 Export | 📥 Import</footer>
+				<footer>💾 localStorage • 📤 Exportar | 📥 Importar • ✓ Sincronizado: ${new Date().toLocaleTimeString('pt-BR')}</footer>
 			`;
 			document.getElementById('btn-import').addEventListener('click', showImportModal);
+			document.getElementById('btn-demo').addEventListener('click', () => {
+				const samples = [
+					{ id: 'lei-10216', tema: 'Lei 10.216', módulo: 'Nivelamento', data_planejada: '2026-07-29', status: 'concluído', acertos: 18, erros: 2, método: 'aula', nota: '' },
+					{ id: 'modal-internacao', tema: 'Modalidades de Internação', módulo: 'Nivelamento', data_planejada: '2026-07-30', status: 'não-iniciado', acertos: null, erros: null, método: null, nota: '' },
+					{ id: 'cid10', tema: 'CID-10 Depressão', módulo: 'Transtornos Depressivos', data_planejada: '2026-08-03', status: 'em-progresso', acertos: 12, erros: 5, método: 'recall', nota: '' },
+					{ id: 'psicofarmaco', tema: 'Psicofarmacologia', módulo: 'Transtornos Depressivos', data_planejada: '2026-08-04', status: 'não-iniciado', acertos: null, erros: null, método: null, nota: '' },
+					{ id: 'psicoterapia', tema: 'Psicoterapia Cognitivista', módulo: 'Transtornos Depressivos', data_planejada: '2026-08-05', status: 'concluído', acertos: 20, erros: 0, método: 'exercício', nota: 'Referência rápida Socrático' },
+				];
+				samples.forEach(s => {
+					s.data_concluída = s.status === 'concluído' ? s.data_planejada : null;
+					s.cor_tema = window.ColorCalc.getThemeColor(s);
+					s.débito_detectado = false;
+					s.minutos_débito = 0;
+					DataModel.addTheme(s);
+				});
+				location.reload();
+			});
 		};
 
 		window.addEventListener('DOMContentLoaded', () => {
@@ -1024,6 +1051,15 @@
 				TableUI.render();
 				DailySummaryUI.render();
 				DragDropManager.enableDragDrop();
+
+				// Add import button to header
+				const header = document.querySelector('header');
+				const importBtn = document.createElement('button');
+				importBtn.id = 'btn-import-main';
+				importBtn.textContent = '📥 Importar';
+				importBtn.style.cssText = 'padding: 0.5rem 1rem; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 0.5rem; font-size: 0.95rem;';
+				importBtn.addEventListener('click', showImportModal);
+				header.appendChild(importBtn);
 			}
 		});
 	</script>
