@@ -505,6 +505,23 @@
 					} else {
 						container.appendChild(tableDiv);
 					}
+
+					tableDiv.querySelectorAll('.btn-edit').forEach(btn => {
+						btn.addEventListener('click', (e) => {
+							const id = e.currentTarget.getAttribute('data-id');
+							FormModal.open(id);
+						});
+					});
+
+					tableDiv.querySelectorAll('.btn-obsidian').forEach(btn => {
+						btn.addEventListener('click', (e) => {
+							const id = e.currentTarget.getAttribute('data-id');
+							const theme = DataModel.getThemeById(id);
+							if (!theme) return;
+							const fileName = `A2 — ${theme.tema}`;
+							window.location.href = `obsidian://open?path=03%20Anota%C3%A7%C3%B5es%2F${encodeURIComponent(fileName)}`;
+						});
+					});
 				},
 			};
 		})();
@@ -589,7 +606,130 @@
 			};
 		})();
 
-		window.showImportModal = () => {
+		window.FormModal = (() => {
+				const parseNumberOrNull = (val) => {
+					if (val === '' || val === null || val === undefined) return null;
+					const n = parseInt(val, 10);
+					return Number.isNaN(n) ? null : n;
+				};
+
+				return {
+					open(themeId) {
+						const theme = DataModel.getThemeById(themeId);
+						if (!theme) {
+							console.error('Theme not found:', themeId);
+							return;
+						}
+
+						// Guard against a stray modal left over from a previous open().
+						const existing = document.getElementById('form-modal');
+						if (existing) existing.remove();
+
+						const modal = document.createElement('div');
+						modal.id = 'form-modal';
+						modal.className = 'modal-overlay';
+
+						const today = new Date().toISOString().split('T')[0];
+						const acertosVal = theme.acertos !== null && theme.acertos !== undefined ? theme.acertos : '';
+						const errosVal = theme.erros !== null && theme.erros !== undefined ? theme.erros : '';
+
+						modal.innerHTML = `
+							<div class="modal-content">
+								<h2>${theme.tema}</h2>
+								<form id="theme-form" style="display: grid; gap: 1rem;">
+									<div>
+										<label><input type="checkbox" id="status-check" ${theme.status === 'concluído' ? 'checked' : ''}> Concluído?</label>
+									</div>
+
+									<div>
+										<label for="data-concluida">Data Concluída</label>
+										<input type="date" id="data-concluida" value="${theme.data_concluída || today}">
+									</div>
+
+									<div>
+										<label for="acertos">Acertos</label>
+										<input type="number" id="acertos" value="${acertosVal}" placeholder="8">
+									</div>
+
+									<div>
+										<label for="erros">Erros</label>
+										<input type="number" id="erros" value="${errosVal}" placeholder="2">
+									</div>
+
+									<div>
+										<label for="metodo">Método</label>
+										<select id="metodo">
+											<option value="">— Selecione —</option>
+											<option value="vídeo" ${theme.método === 'vídeo' ? 'selected' : ''}>Vídeo</option>
+											<option value="leitura" ${theme.método === 'leitura' ? 'selected' : ''}>Leitura</option>
+											<option value="recall" ${theme.método === 'recall' ? 'selected' : ''}>Recall</option>
+											<option value="exercício" ${theme.método === 'exercício' ? 'selected' : ''}>Exercício</option>
+											<option value="revisão" ${theme.método === 'revisão' ? 'selected' : ''}>Revisão</option>
+										</select>
+									</div>
+
+									<div>
+										<label for="nota">Nota</label>
+										<textarea id="nota" style="width: 100%; height: 80px; padding: 0.5rem; border: 1px solid var(--color-gray); border-radius: 4px;">${theme.nota || ''}</textarea>
+									</div>
+
+									<div style="display: flex; gap: 0.5rem;">
+										<button type="button" id="btn-form-save" style="flex: 1; padding: 0.75rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">Salvar</button>
+										<button type="button" id="btn-form-cancel" style="flex: 1; padding: 0.75rem; background: var(--color-gray); color: white; border: none; border-radius: 4px; cursor: pointer;">Cancelar</button>
+										<button type="button" id="btn-form-obsidian" style="flex: 1; padding: 0.75rem; background: #7c3aed; color: white; border: none; border-radius: 4px; cursor: pointer;">🔗 Obsidian</button>
+									</div>
+								</form>
+							</div>
+						`;
+
+						document.body.appendChild(modal);
+
+						const closeModal = () => modal.remove();
+
+						modal.addEventListener('click', (e) => {
+							if (e.target === modal) closeModal();
+						});
+
+						document.getElementById('btn-form-cancel').addEventListener('click', closeModal);
+
+						document.getElementById('btn-form-save').addEventListener('click', () => {
+							const statusCheck = document.getElementById('status-check').checked;
+							const acertos = parseNumberOrNull(document.getElementById('acertos').value);
+							const erros = parseNumberOrNull(document.getElementById('erros').value);
+							const método = document.getElementById('metodo').value || null;
+							const nota = document.getElementById('nota').value;
+							const dataConcluida = document.getElementById('data-concluida').value;
+
+							DataModel.updateTheme(themeId, {
+								status: statusCheck ? 'concluído' : 'em-progresso',
+								data_concluída: statusCheck ? dataConcluida : null,
+								acertos,
+								erros,
+								método,
+								nota,
+							});
+
+							// Recalc color from the freshly saved fields and persist it.
+							const updated = DataModel.getThemeById(themeId);
+							const cor_tema = ColorCalc.getThemeColor(updated);
+							DataModel.updateTheme(themeId, { cor_tema });
+
+							closeModal();
+							TimelineUI.render();
+							TableUI.render();
+							DailySummaryUI.render();
+							console.log(`✓ Theme ${themeId} updated via FormModal`);
+						});
+
+						document.getElementById('btn-form-obsidian').addEventListener('click', () => {
+							const fileName = `A2 — ${theme.tema}`;
+							window.location.href = `obsidian://open?path=03%20Anota%C3%A7%C3%B5es%2F${encodeURIComponent(fileName)}`;
+						});
+					},
+				};
+			})();
+
+			window.showImportModal = () => {
 			const overlay = document.createElement('div');
 			overlay.className = 'modal-overlay';
 			overlay.id = 'import-modal-overlay';
