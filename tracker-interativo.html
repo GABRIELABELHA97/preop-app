@@ -84,6 +84,11 @@
 		.theme-table tr:hover { background: var(--color-light); }
 		.btn-edit, .btn-obsidian { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; margin-right: 0.5rem; }
 		.btn-edit:hover, .btn-obsidian:hover { transform: scale(1.2); }
+
+		.summary-table { width: 100%; font-size: 0.85rem; border-collapse: collapse; margin-top: 1rem; }
+		.summary-table th, .summary-table td { padding: 0.5rem; text-align: center; border-bottom: 1px solid var(--color-gray); }
+		.summary-table th { background: var(--color-dark); color: var(--color-white); font-weight: bold; }
+		.color-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
 	</style>
 </head>
 <body>
@@ -487,6 +492,86 @@
 						document.getElementById('table-view').replaceWith(tableDiv);
 					} else {
 						container.appendChild(tableDiv);
+					}
+				},
+			};
+		})();
+
+		window.DailySummaryUI = (() => {
+			// 'YYYY-MM-DD' dates from 2026-07-27 to 2026-08-26, inclusive.
+			const generateAllDates = () => {
+				const result = [];
+				const end = new Date('2026-08-26T00:00:00');
+				let current = new Date('2026-07-27T00:00:00');
+				while (current <= end) {
+					result.push(current.toISOString().split('T')[0]);
+					current.setDate(current.getDate() + 1);
+				}
+				return result;
+			};
+
+			// 'YYYY-MM-DD' → 'seg' (manual lookup, same reasoning as
+			// TimelineUI.formatDayHeader: pt-BR's short-weekday locale format
+			// isn't a plain 3-letter abbreviation).
+			const DAY_NAMES = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+			const dayName = (date) => DAY_NAMES[new Date(`${date}T00:00:00`).getDay()];
+
+			// Sum a numeric field (acertos/erros) across a day's themes, treating
+			// null entries as 0.
+			const sumField = (themes, field) => themes.reduce((total, t) => total + (t[field] !== null ? t[field] : 0), 0);
+
+			const renderRow = (date) => {
+				const dayThemes = DataModel.getThemesByDate(date);
+				const summary = DataModel.getTodaysSummary(date);
+				const color = ColorCalc.getDayColor(dayThemes, summary.planejado);
+				const acertos = sumField(dayThemes, 'acertos');
+				const erros = sumField(dayThemes, 'erros');
+
+				return `<tr style="background-color: ${color}22">
+					<td>${date}</td>
+					<td>${dayName(date)}</td>
+					<td>${summary.planejado}</td>
+					<td>${summary.concluído}</td>
+					<td>${summary.pct}%</td>
+					<td><span class="color-dot" style="background-color: ${color}">●</span></td>
+					<td>${acertos || '—'}</td>
+					<td>${erros || '—'}</td>
+					<td>-</td>
+				</tr>`;
+			};
+
+			return {
+				render() {
+					const rows = generateAllDates().map(renderRow).join('');
+					const html = `<div class="daily-summary">
+						<h2>📈 Resumo Diário</h2>
+						<table class="summary-table">
+							<thead>
+								<tr>
+									<th>Data</th>
+									<th>Dia</th>
+									<th>Plan.</th>
+									<th>Concl.</th>
+									<th>%</th>
+									<th>Cor</th>
+									<th>Acertos</th>
+									<th>Erros</th>
+									<th>Nota</th>
+								</tr>
+							</thead>
+							<tbody>${rows}</tbody>
+						</table>
+					</div>`;
+
+					const container = document.querySelector('main') || document.getElementById('app');
+					const summaryDiv = document.createElement('div');
+					summaryDiv.id = 'summary-view';
+					summaryDiv.innerHTML = html;
+
+					if (document.getElementById('summary-view')) {
+						document.getElementById('summary-view').replaceWith(summaryDiv);
+					} else {
+						container.appendChild(summaryDiv);
 					}
 				},
 			};
