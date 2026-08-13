@@ -177,6 +177,96 @@
 				},
 			};
 		})();
+
+		window.MDParser = (() => {
+			// "29/07" → "2026-07-29"
+			const normalizeDate = (dateStr) => {
+				const [day, month] = dateStr.split('/').map(s => s.trim());
+				return `2026-${month}-${day}`;
+			};
+
+			// "Lei 10.216 (✅ já concluído)" → "lei-10-216"
+			const themesToIds = (themeStr) => {
+				return themeStr
+					.replace(/\([^)]*\)/g, '') // remove parentheses
+					.trim()
+					.toLowerCase()
+					.replace(/\s+/g, '-')
+					.replace(/[^a-z0-9-]/g, '');
+			};
+
+			// "00. Nivelamento" → "Nivelamento"
+			const normalizeModule = (moduloStr) => {
+				return moduloStr.replace(/^\d+\.\s*/, '').trim();
+			};
+
+			// Split a markdown table row into trimmed cells, dropping the empty
+			// leading/trailing entries produced by the outer pipes.
+			const parseRow = (line) => {
+				const cells = line.split('|').map(c => c.trim());
+				if (cells.length && cells[0] === '') cells.shift();
+				if (cells.length && cells[cells.length - 1] === '') cells.pop();
+				return cells;
+			};
+
+			// Header separator row, e.g. "|---|---|:---:|"
+			const isSeparatorRow = (cells) => {
+				return cells.length > 0 && cells.every(c => /^:?-+:?$/.test(c));
+			};
+
+			const parse = (mdText) => {
+				if (!mdText) return [];
+
+				const lines = mdText.split('\n');
+				const tableLines = lines.filter(line => line.trim().startsWith('|'));
+				if (tableLines.length === 0) return [];
+
+				// First table line is the header — use it to locate columns by name
+				// so the parser doesn't depend on a fixed column order.
+				const headerCells = parseRow(tableLines[0]).map(h => h.toLowerCase());
+				const colIndex = {
+					data: headerCells.findIndex(h => h === 'data'),
+					módulo: headerCells.findIndex(h => h === 'módulo' || h === 'modulo'),
+					tema: headerCells.findIndex(h => h.includes('vídeo') || h.includes('video') || h.includes('tema')),
+				};
+
+				const themes = [];
+
+				for (let i = 1; i < tableLines.length; i++) {
+					const cells = parseRow(tableLines[i]);
+					if (cells.length === 0 || isSeparatorRow(cells)) continue;
+
+					const temaCell = colIndex.tema >= 0 ? cells[colIndex.tema] : null;
+					if (!temaCell) continue;
+
+					const id = themesToIds(temaCell);
+					if (!id) continue;
+
+					const dataCell = colIndex.data >= 0 ? cells[colIndex.data] : null;
+					const moduloCell = colIndex.módulo >= 0 ? cells[colIndex.módulo] : null;
+
+					themes.push({
+						id,
+						tema: temaCell.replace(/\([^)]*\)/g, '').trim(),
+						módulo: moduloCell ? normalizeModule(moduloCell) : 'Nivelamento',
+						data_planejada: dataCell ? normalizeDate(dataCell) : null,
+						status: 'não-iniciado',
+						data_concluída: null,
+						acertos: null,
+						erros: null,
+						método: null,
+						nota: '',
+						cor_tema: '#95a5a6',
+						débito_detectado: false,
+						minutos_débito: 0,
+					});
+				}
+
+				return themes;
+			};
+
+			return { parse };
+		})();
 	</script>
 </body>
 </html>
