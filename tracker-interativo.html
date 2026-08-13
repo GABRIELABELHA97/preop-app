@@ -199,6 +199,10 @@
 					return { planejado: planned, concluído: completed, pct };
 				},
 
+				getLastSync() {
+					return state.lastSync;
+				},
+
 				clear() {
 					state = { temas: [], lastSync: null };
 					localStorage.removeItem(STORAGE_KEY);
@@ -807,6 +811,159 @@
 						});
 					},
 				};
+			})();
+
+			window.ExportManager = (() => {
+				const DAY_NAMES = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+
+				// hex color → status emoji.
+				const colorToEmoji = (hex) => {
+					switch (hex) {
+						case '#2ecc71': return '🟢';
+						case '#f39c12': return '🟠';
+						case '#e74c3c': return '🔴';
+						default: return '⚪';
+					}
+				};
+
+				// Today's date as 'YYYY-MM-DD' (local time, not UTC).
+				const todayISO = () => {
+					const d = new Date();
+					const mm = String(d.getMonth() + 1).padStart(2, '0');
+					const dd = String(d.getDate()).padStart(2, '0');
+					return `${d.getFullYear()}-${mm}-${dd}`;
+				};
+
+				// 'YYYY-MM-DD' dates from 2026-07-27 to 2026-08-26, inclusive
+				// (same range as DailySummaryUI).
+				const generateAllDates = () => {
+					const result = [];
+					const end = new Date('2026-08-26T00:00:00');
+					let current = new Date('2026-07-27T00:00:00');
+					while (current <= end) {
+						result.push(current.toISOString().split('T')[0]);
+						current.setDate(current.getDate() + 1);
+					}
+					return result;
+				};
+
+				const buildCompletedThemesSection = (temas) => {
+					let md = '## Temas Concluídos (com métricas)\n\n';
+					md += '| Tema | Data Conc. | Acertos | Erros | Método | Cor |\n';
+					md += '|------|------------|---------|-------|--------|-----|\n';
+
+					temas
+						.filter(t => t.status === 'concluído')
+						.forEach(t => {
+							const dataConcluida = t.data_concluída || '—';
+							const acertos = (t.acertos !== null && t.acertos !== undefined) ? t.acertos : '—';
+							const erros = (t.erros !== null && t.erros !== undefined) ? t.erros : '—';
+							const método = t.método || '—';
+							const cor = colorToEmoji(ColorCalc.getThemeColor(t));
+							md += `| ${t.tema} | ${dataConcluida} | ${acertos} | ${erros} | ${método} | ${cor} |\n`;
+						});
+
+					return md + '\n';
+				};
+
+				const buildDailyStatusSection = () => {
+					let md = '## Status Diário (agregado)\n\n';
+					md += '| Data | Dia | Planejado | Concluído | % | Cor | Dívida? |\n';
+					md += '|------|-----|-----------|-----------|---|-----|--------|\n';
+
+					generateAllDates().forEach(date => {
+						const dayThemes = DataModel.getThemesByDate(date);
+						const summary = DataModel.getTodaysSummary(date);
+						const color = ColorCalc.getDayColor(dayThemes, summary.planejado);
+						const dayName = DAY_NAMES[new Date(`${date}T00:00:00`).getDay()];
+						const hasDebt = dayThemes.some(t => t.débito_detectado);
+						md += `| ${date} | ${dayName} | ${summary.planejado} | ${summary.concluído} | ${summary.pct}% | ${colorToEmoji(color)} | ${hasDebt ? '⚠️ sim' : 'não'} |\n`;
+					});
+
+					return md + '\n';
+				};
+
+				const buildPendingDebtsSection = (temas) => {
+					const dividas = temas.filter(t => t.débito_detectado);
+					if (dividas.length === 0) return '';
+
+					let md = '## Dívidas Pendentes\n\n';
+					dividas.forEach(t => {
+						md += `- **${t.tema}** (${t.data_planejada}): ${t.minutos_débito}min\n`;
+					});
+					return md + '\n';
+				};
+
+				const generateMarkdown = () => {
+					const temas = DataModel.getThemes();
+					const lastSync = DataModel.getLastSync();
+					const lastSyncStr = lastSync ? lastSync.split('T')[0] : '—';
+
+					let md = `# Tracker — Export ${todayISO()}\n\n`;
+					md += `**Last synced:** ${lastSyncStr}\n\n`;
+					md += buildCompletedThemesSection(temas);
+					md += buildDailyStatusSection();
+					md += buildPendingDebtsSection(temas);
+
+					return md.trimEnd() + '\n';
+				};
+
+				const showExportModal = () => {
+					const markdown = generateMarkdown();
+
+					// Guard against a stray modal left over from a previous open().
+					const existing = document.getElementById('export-modal-overlay');
+					if (existing) existing.remove();
+
+					const overlay = document.createElement('div');
+					overlay.className = 'modal-overlay';
+					overlay.id = 'export-modal-overlay';
+					overlay.innerHTML = `
+						<div class="modal-content">
+							<h2>📤 Exportar para Obsidian</h2>
+							<p>Copie o texto abaixo e cole em seu Obsidian (ex: <code>04 Cronograma/Tracker Export.md</code>):</p>
+							<textarea id="export-textarea" rows="20" readonly></textarea>
+							<div class="modal-actions">
+								<button id="btn-close-export" class="btn-cancel">Fechar</button>
+								<button id="btn-copy-export" class="btn-process">📋 Copiar para Clipboard</button>
+							</div>
+						</div>
+					`;
+					document.body.appendChild(overlay);
+					document.getElementById('export-textarea').value = markdown;
+
+					const closeModal = () => overlay.remove();
+
+					overlay.addEventListener('click', (e) => {
+						if (e.target === overlay) closeModal();
+					});
+
+					document.getElementById('btn-close-export').addEventListener('click', closeModal);
+
+					document.getElementById('btn-copy-export').addEventListener('click', () => {
+						const textarea = document.getElementById('export-textarea');
+						textarea.select();
+
+						const fallbackCopy = () => {
+							try {
+								document.execCommand('copy');
+								console.log('✓ Markdown copiado para clipboard (fallback)');
+							} catch (e) {
+								console.error('Falha ao copiar markdown:', e);
+							}
+						};
+
+						if (navigator.clipboard && navigator.clipboard.writeText) {
+							navigator.clipboard.writeText(markdown)
+								.then(() => console.log('✓ Markdown copiado para clipboard'))
+								.catch(fallbackCopy);
+						} else {
+							fallbackCopy();
+						}
+					});
+				};
+
+				return { generateMarkdown, showExportModal, colorToEmoji };
 			})();
 
 			window.showImportModal = () => {
