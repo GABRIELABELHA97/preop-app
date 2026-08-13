@@ -72,6 +72,11 @@
 		.color-orange { background-color: var(--color-orange); }
 		.color-red { background-color: var(--color-red); }
 		.status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.85rem; font-weight: bold; }
+
+		.week-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
+		.day-slot { background: var(--color-white); border: 1px solid var(--color-gray); border-radius: 4px; padding: 0.5rem; font-size: 0.85rem; }
+		.day-content { margin-top: 0.25rem; }
+		.theme-card { margin: 0.25rem 0; padding: 0.25rem 0.5rem; border-radius: 2px; font-size: 0.75rem; cursor: pointer; }
 	</style>
 </head>
 <body>
@@ -346,6 +351,81 @@
 				isGreen,
 				isOrange,
 				isRed,
+			};
+		})();
+
+		window.TimelineUI = (() => {
+			const weeks = [
+				{ name: 'Semana 1', start: '2026-07-29', end: '2026-08-02', days: ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'] },
+				{ name: 'Semana 2', start: '2026-08-03', end: '2026-08-09', days: ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'] },
+				{ name: 'Semana 3', start: '2026-08-10', end: '2026-08-16', days: ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'] },
+				{ name: 'Semana 4', start: '2026-08-17', end: '2026-08-23', days: ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'] },
+				{ name: 'Semana 5', start: '2026-08-24', end: '2026-08-26', days: ['seg', 'ter', 'qua', 'qui', 'ter'] },
+			];
+
+			// Array of 'YYYY-MM-DD' dates from start to end, inclusive.
+			const dateRange = (start, end) => {
+				const result = [];
+				const endDate = new Date(`${end}T00:00:00`);
+				let current = new Date(`${start}T00:00:00`);
+				while (current <= endDate) {
+					result.push(current.toISOString().split('T')[0]);
+					current.setDate(current.getDate() + 1);
+				}
+				return result;
+			};
+
+			// 'YYYY-MM-DD' → 'seg 29/07' (built manually — toLocaleDateString's
+			// pt-BR short weekday format inserts a comma, e.g. "qua., 29/07").
+			const DAY_NAMES = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+			const formatDayHeader = (date) => {
+				const d = new Date(`${date}T00:00:00`);
+				const dd = String(d.getDate()).padStart(2, '0');
+				const mm = String(d.getMonth() + 1).padStart(2, '0');
+				return `${DAY_NAMES[d.getDay()]} ${dd}/${mm}`;
+			};
+
+			const renderThemeCard = (tema) => {
+				const color = ColorCalc.getThemeColor(tema);
+				const statusIcon = tema.status === 'concluído' ? '✓ ' : '';
+				const debtLabel = tema.débito_detectado ? ` [DÉBITO: ${tema.minutos_débito}min]` : '';
+				return `<div class="theme-card" data-theme-id="${tema.id}" style="background-color: ${color}33; border-left: 3px solid ${color}">${statusIcon}${tema.tema}${debtLabel}</div>`;
+			};
+
+			const renderDaySlot = (date) => {
+				const dayThemes = DataModel.getThemesByDate(date);
+				const dayColor = ColorCalc.getDayColor(dayThemes, dayThemes.length);
+				const cards = dayThemes.map(renderThemeCard).join('');
+				return `<div class="day-slot" data-date="${date}" style="border-left: 4px solid ${dayColor}">
+					<strong>${formatDayHeader(date)}</strong>
+					<div class="day-content">
+						<small>[planejado: ${dayThemes.length} temas]</small>
+						${cards}
+					</div>
+				</div>`;
+			};
+
+			const renderWeek = (week) => {
+				const daySlots = dateRange(week.start, week.end).map(renderDaySlot).join('');
+				return `<div class="week-card">
+					<h3>${week.name}</h3>
+					<div class="week-grid">${daySlots}</div>
+				</div>`;
+			};
+
+			return {
+				render() {
+					const app = document.getElementById('app');
+					const weeksHtml = weeks.map(renderWeek).join('');
+
+					app.innerHTML = `
+						<header><h1>📊 Tracker Interativo — Pós Psiquiatria</h1><p>27/07–26/08/2026 • ~80 temas</p></header>
+						<main>
+							<div class="timeline">${weeksHtml}</div>
+						</main>
+						<footer>💾 localStorage • 📤 Export | 📥 Import</footer>
+					`;
+				},
 			};
 		})();
 	</script>
