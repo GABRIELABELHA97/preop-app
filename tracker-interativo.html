@@ -77,6 +77,106 @@
 <body>
 	<div id="app"></div>
 	<script>
+		window.DataModel = (() => {
+			const STORAGE_KEY = 'tracker-2026-07-27-26-08';
+
+			// Theme structure
+			const themeTemplate = {
+				id: '',                    // slug
+				tema: '',                  // name
+				módulo: 'Nivelamento',     // enum: Nivelamento | Transtornos Depressivos | Casos
+				data_planejada: null,      // Date object (YYYY-MM-DD)
+				status: 'não-iniciado',    // enum: não-iniciado | em-progresso | concluído | revisado
+				data_concluída: null,      // Date object
+				acertos: null,             // number or null
+				erros: null,               // number or null
+				método: null,              // enum: vídeo | leitura | recall | exercício | revisão | null
+				nota: '',                  // string
+				cor_tema: '#95a5a6',       // hex color
+				débito_detectado: false,   // boolean
+				minutos_débito: 0,         // number
+			};
+
+			let state = {
+				temas: [],
+				lastSync: null,
+			};
+
+			const _save = () => {
+				state.lastSync = new Date().toISOString();
+				localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+			};
+
+			return {
+				init() {
+					const stored = localStorage.getItem(STORAGE_KEY);
+					if (stored) {
+						try {
+							state = JSON.parse(stored);
+							console.log(`✓ Loaded ${state.temas.length} themes from localStorage`);
+						} catch (e) {
+							console.error('Failed to parse localStorage:', e);
+							state = { temas: [], lastSync: null };
+						}
+					} else {
+						state = { temas: [], lastSync: null };
+					}
+				},
+
+				getThemes() {
+					return state.temas;
+				},
+
+				getThemeById(id) {
+					return state.temas.find(t => t.id === id) || null;
+				},
+
+				getThemesByModule(módulo) {
+					return state.temas.filter(t => t.módulo === módulo);
+				},
+
+				getThemesByDate(date) {
+					// date as 'YYYY-MM-DD'
+					return state.temas.filter(t => t.data_planejada === date);
+				},
+
+				updateTheme(id, fields) {
+					const theme = this.getThemeById(id);
+					if (!theme) {
+						console.warn(`Theme ${id} not found`);
+						return;
+					}
+					Object.assign(theme, fields);
+					_save();
+					console.log(`✓ Updated theme ${id}`);
+				},
+
+				addTheme(theme) {
+					if (!theme.id) {
+						console.error('Theme must have id');
+						return;
+					}
+					state.temas.push({ ...themeTemplate, ...theme });
+					_save();
+					console.log(`✓ Added theme ${theme.id}`);
+				},
+
+				getTodaysSummary(date) {
+					// date as 'YYYY-MM-DD'
+					const themesForDate = this.getThemesByDate(date);
+					const completed = themesForDate.filter(t => t.status === 'concluído').length;
+					const planned = themesForDate.length;
+					const pct = planned > 0 ? Math.round((completed / planned) * 100) : 0;
+					return { planejado: planned, concluído: completed, pct };
+				},
+
+				clear() {
+					state = { temas: [], lastSync: null };
+					localStorage.removeItem(STORAGE_KEY);
+					console.log('✓ Cleared all data');
+				},
+			};
+		})();
 	</script>
 </body>
 </html>
