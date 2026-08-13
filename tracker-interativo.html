@@ -413,7 +413,7 @@
 				const color = ColorCalc.getThemeColor(tema);
 				const statusIcon = tema.status === 'concluído' ? '✓ ' : '';
 				const debtLabel = tema.débito_detectado ? ` [DÉBITO: ${tema.minutos_débito}min]` : '';
-				return `<div class="theme-card" data-theme-id="${tema.id}" style="background-color: ${color}33; border-left: 3px solid ${color}">${statusIcon}${tema.tema}${debtLabel}</div>`;
+				return `<div class="theme-card" draggable="true" data-theme-id="${tema.id}" style="background-color: ${color}33; border-left: 3px solid ${color}">${statusIcon}${tema.tema}${debtLabel}</div>`;
 			};
 
 			const renderDaySlot = (date) => {
@@ -606,6 +606,85 @@
 			};
 		})();
 
+		window.DragDropManager = (() => {
+			// 'YYYY-MM-DD' → 'DD/MM'
+			const formatDateBR = (dateStr) => {
+				if (!dateStr) return '?';
+				const [y, m, d] = dateStr.split('-');
+				return `${d}/${m}`;
+			};
+
+			const handleDrop = (themeId, newDate) => {
+				const theme = DataModel.getThemeById(themeId);
+				if (!theme) {
+					console.warn(`Theme ${themeId} not found`);
+					return;
+				}
+
+				const oldDate = theme.data_planejada;
+				if (oldDate === newDate) return; // dropped back on the same day, no-op
+
+				const isDebt = theme.status !== 'concluído';
+				const updates = { data_planejada: newDate };
+
+				if (isDebt) {
+					updates.débito_detectado = true;
+					updates.minutos_débito = 40; // placeholder; idealmente viria de Tabela Hora a Hora
+					console.log(`⚠️ Débito detectado: moveu "${theme.tema}" de ${formatDateBR(oldDate)} para ${formatDateBR(newDate)}`);
+				} else {
+					updates.débito_detectado = false;
+					console.log(`✓ Movido "${theme.tema}" para ${formatDateBR(newDate)}`);
+				}
+
+				DataModel.updateTheme(themeId, updates);
+
+				TimelineUI.render();
+				TableUI.render();
+				DailySummaryUI.render();
+
+				enableDragDrop();
+			};
+
+			const enableDragDrop = () => {
+				document.querySelectorAll('.theme-card').forEach((card) => {
+					card.setAttribute('draggable', 'true');
+
+					card.addEventListener('dragstart', (e) => {
+						card.style.opacity = '0.5';
+						e.dataTransfer.effectAllowed = 'move';
+						e.dataTransfer.setData('text/plain', card.getAttribute('data-theme-id'));
+					});
+
+					card.addEventListener('dragend', () => {
+						card.style.opacity = '1';
+					});
+				});
+
+				document.querySelectorAll('.day-slot').forEach((slot) => {
+					slot.addEventListener('dragover', (e) => {
+						e.preventDefault();
+						slot.style.background = '#ecf0f1';
+					});
+
+					slot.addEventListener('dragleave', () => {
+						slot.style.background = '';
+					});
+
+					slot.addEventListener('drop', (e) => {
+						e.preventDefault();
+						slot.style.background = '';
+						const themeId = e.dataTransfer.getData('text/plain');
+						const newDate = slot.getAttribute('data-date');
+						if (themeId && newDate) {
+							handleDrop(themeId, newDate);
+						}
+					});
+				});
+			};
+
+			return { enableDragDrop, handleDrop };
+		})();
+
 		window.FormModal = (() => {
 				const parseNumberOrNull = (val) => {
 					if (val === '' || val === null || val === undefined) return null;
@@ -718,6 +797,7 @@
 							TimelineUI.render();
 							TableUI.render();
 							DailySummaryUI.render();
+							DragDropManager.enableDragDrop();
 							console.log(`✓ Theme ${themeId} updated via FormModal`);
 						});
 
@@ -786,6 +866,7 @@
 				TimelineUI.render();
 				TableUI.render();
 				DailySummaryUI.render();
+				DragDropManager.enableDragDrop();
 			}
 		});
 	</script>
