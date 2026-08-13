@@ -106,6 +106,13 @@
 <body>
 	<div id="app"></div>
 	<script>
+		const escapeHtml = (text) => {
+			if (!text) return '';
+			const div = document.createElement('div');
+			div.textContent = text;
+			return div.innerHTML;
+		};
+
 		window.DataModel = (() => {
 			const STORAGE_KEY = 'tracker-2026-07-27-26-08';
 
@@ -185,9 +192,15 @@
 						console.error('Theme must have id');
 						return;
 					}
-					state.temas.push({ ...themeTemplate, ...theme });
+					const existing = state.temas.find(t => t.id === theme.id);
+					if (existing) {
+						Object.assign(existing, theme);
+						console.log(`✓ Updated existing theme ${theme.id}`);
+					} else {
+						state.temas.push({ ...themeTemplate, ...theme });
+						console.log(`✓ Added new theme ${theme.id}`);
+					}
 					_save();
-					console.log(`✓ Added theme ${theme.id}`);
 				},
 
 				getTodaysSummary(date) {
@@ -218,12 +231,14 @@
 				return `2026-${month}-${day}`;
 			};
 
-			// "Lei 10.216 (✅ já concluído)" → "lei-10-216"
+			// "Lei 10.216 (✅ já concluído)" → "lei-10-216"; "Depressão" → "depressao"
 			const themesToIds = (themeStr) => {
 				return themeStr
 					.replace(/\([^)]*\)/g, '') // remove parentheses
 					.trim()
 					.toLowerCase()
+					.normalize('NFD')                    // Separate accents from letters
+					.replace(/[̀-ͯ]/g, '')     // Remove diacritics
 					.replace(/\s+/g, '-')
 					.replace(/[^a-z0-9-]/g, '');
 			};
@@ -339,7 +354,7 @@
 			const getDayColor = (themes, planejado) => {
 				// If no themes for this day
 				if (themes.length === 0) {
-					return COLORS.red;
+					return COLORS.gray;
 				}
 
 				// Check for unpaid debt
@@ -417,7 +432,7 @@
 				const color = ColorCalc.getThemeColor(tema);
 				const statusIcon = tema.status === 'concluído' ? '✓ ' : '';
 				const debtLabel = tema.débito_detectado ? ` [DÉBITO: ${tema.minutos_débito}min]` : '';
-				return `<div class="theme-card" draggable="true" data-theme-id="${tema.id}" style="background-color: ${color}33; border-left: 3px solid ${color}">${statusIcon}${tema.tema}${debtLabel}</div>`;
+				return `<div class="theme-card" draggable="true" data-theme-id="${tema.id}" style="background-color: ${color}33; border-left: 3px solid ${color}">${statusIcon}${escapeHtml(tema.tema)}${debtLabel}</div>`;
 			};
 
 			const renderDaySlot = (date) => {
@@ -454,12 +469,20 @@
 						<footer>💾 localStorage • 📤 Exportar | 📥 Importar • ✓ Sincronizado: ${new Date().toLocaleTimeString('pt-BR')}</footer>
 					`;
 
-					// Add export button to header
+					// Add import and export buttons to header
 					const header = document.querySelector('header');
+
+					const importBtn = document.createElement('button');
+					importBtn.id = 'btn-import-main';
+					importBtn.textContent = '📥 Importar';
+					importBtn.style.cssText = 'padding: 0.5rem 1rem; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 1rem; font-size: 0.95rem;';
+					importBtn.addEventListener('click', showImportModal);
+					header.appendChild(importBtn);
+
 					const exportBtn = document.createElement('button');
 					exportBtn.id = 'btn-export-main';
 					exportBtn.textContent = '📤 Exportar';
-					exportBtn.style.cssText = 'padding: 0.5rem 1rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 1rem; font-size: 0.95rem;';
+					exportBtn.style.cssText = 'padding: 0.5rem 1rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 0.5rem; font-size: 0.95rem;';
 					exportBtn.addEventListener('click', () => ExportManager.showExportModal());
 					header.appendChild(exportBtn);
 				},
@@ -492,8 +515,8 @@
 
 						html += `<tr>
 							<td>${idx + 1}</td>
-							<td>${tema.tema}</td>
-							<td>${tema.módulo}</td>
+							<td>${escapeHtml(tema.tema)}</td>
+							<td>${escapeHtml(tema.módulo)}</td>
 							<td>${tema.data_planejada}</td>
 							<td><span class="status-badge" style="background-color: ${color}">${statusStr}</span></td>
 							<td>${acertos}</td>
@@ -762,7 +785,7 @@
 
 									<div>
 										<label for="nota">Nota</label>
-										<textarea id="nota" style="width: 100%; height: 80px; padding: 0.5rem; border: 1px solid var(--color-gray); border-radius: 4px;">${theme.nota || ''}</textarea>
+										<textarea id="nota" style="width: 100%; height: 80px; padding: 0.5rem; border: 1px solid var(--color-gray); border-radius: 4px;">${escapeHtml(theme.nota || '')}</textarea>
 									</div>
 
 									<div style="display: flex; gap: 0.5rem;">
@@ -1051,15 +1074,6 @@
 				TableUI.render();
 				DailySummaryUI.render();
 				DragDropManager.enableDragDrop();
-
-				// Add import button to header
-				const header = document.querySelector('header');
-				const importBtn = document.createElement('button');
-				importBtn.id = 'btn-import-main';
-				importBtn.textContent = '📥 Importar';
-				importBtn.style.cssText = 'padding: 0.5rem 1rem; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 0.5rem; font-size: 0.95rem;';
-				importBtn.addEventListener('click', showImportModal);
-				header.appendChild(importBtn);
 			}
 		});
 	</script>
